@@ -1,4 +1,5 @@
-#Group B
+# Group B
+
 Members: Alice Russell, Grant Dowling, Sam Soucie, Weifeng Han
 
 ## Homework instructions
