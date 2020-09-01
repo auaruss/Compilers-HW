@@ -1,3 +1,6 @@
+#Group B
+Members: Alice Russell, Grant Dowling, Sam Soucie, Weifeng Han
+
 ## Homework instructions
 
 For your homework exercises, you will be expected to implement various
