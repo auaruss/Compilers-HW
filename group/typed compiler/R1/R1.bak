@@ -1,0 +1,32 @@
+#lang typed/racket
+
+; Notes. These types are still probably more permissive than we would like...
+;        We don't make the typechecker fail if given a function call of the wrong arity.
+;        Though, that could be a good thing if we want to fine-tune our error messages a bit?
+
+
+(struct Int [(value : Fixnum)])
+(struct Prim [(op : Op) (arg* : (Listof Exp))])
+(struct Var [(name : Symbol)])
+(struct Let [(var : Symbol)
+             (rhs : Exp)
+             (body : Exp)])
+
+(struct Program [(info : (Listof (Pairof Symbol Exp)))
+                 (body : Exp)])
+
+(define-type Op (U 'read '+ '-))
+(define-type Exp (U Int
+                    Prim
+                    Var
+                    Let))
+
+(define-type R1 Program)
+
+(define-type Arg (U Int Var))
+
+
+
+
+;(: uniquify (→ R1 R1))
+

@@ -1,4 +1,4 @@
-#lang racket
+#lang typed/racket/nocheck
 (require racket/set racket/stream)
 (require racket/fixnum)
 (require "interp-R0.rkt")
@@ -28,7 +28,7 @@
     ))
 
 
-;; Next we have the partial evaluation pass described in the book.
+;; Next we have the partial evaluation pass described in the bzook.
 (define (pe-neg r)
   (match r
     [(Int n) (Int (fx- 0 n))]
@@ -64,17 +64,36 @@
 ;; HW1 Passes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (uniquify-exp symtab)
-  (lambda (e)
-    (match e
-      [(Var x)
-       (error "TODO: code goes here (uniquify-exp, symbol?)")]
-      [(Int n) (Int n)]
-      [(Let x e body)
-       (error "TODO: code goes here (uniquify-exp, let)")]
-      [(Prim op es)
-       (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]
-      )))
+(define uniquify-exp
+  (λ (symtab)
+    (λ (exp)
+      (match exp
+        [(Var x)
+         (Var (symbol-table-lookup symtab x))]
+        [(Int n) (Int n)]
+        [(Let x e body)
+         (let ([new-x : Symbol (gensym x)]) 
+           (Let new-x
+                ((uniquify-exp symtab) e)
+                ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
+        [(Prim op es)
+         (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]))))
+
+
+(define init-symbol-table
+  (λ ()
+    (let ([init : (Immutable-HashTable Symbol (Listof Symbol)) (make-immutable-hash)]) init)))
+
+(define symbol-table-lookup
+  (λ (symtab x)
+    (if (empty? (dict-ref x)) (error "variable not in scope") (car (dict-ref x)))))
+
+(define extend-symbol-table
+  (λ (symtab x new-x)
+    (dict-set symtab
+              x
+              (let [(not-found : (→ (Listof Symbol)) (λ () '()))]
+                (cons new-x (dict-ref symtab x not-found))))))
 
 ;; uniquify : R1 -> R1
 (define (uniquify p)
