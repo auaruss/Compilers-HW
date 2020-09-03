@@ -1,4 +1,4 @@
-#lang typed/racket/nocheck
+#lang racket
 (require racket/set racket/stream)
 (require racket/fixnum)
 (require "interp-R0.rkt")
