@@ -182,10 +182,10 @@
               (let [(not-found : (→ (Listof Symbol)) (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
-(: remove-complex-opera* (→ R1 R1))
+#|(: remove-complex-opera* (→ R1 R1))
 (define remove-complex-opera*
   ...)
-
+|#
 
 ;; TESTS
 
