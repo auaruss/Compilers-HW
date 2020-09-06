@@ -188,7 +188,7 @@
   (match c0stmt
     [(Assign v e)
      (if (atm? e)
-         (list (Instr 'movq (list e v)))
+         (list (Instr 'movq (list (sel-ins-atm e) v)))
          (match e
            [(Prim 'read '())
             (list (Callq 'read_int)
@@ -287,7 +287,7 @@
     ))
 
 ;;TEST
-(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
+;;(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
 
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
