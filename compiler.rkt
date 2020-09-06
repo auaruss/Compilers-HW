@@ -287,7 +287,7 @@
     ))
 
 ;;TEST
-;;(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
+(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
 
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
