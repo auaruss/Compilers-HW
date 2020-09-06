@@ -182,8 +182,7 @@
               (let [(not-found : (→ (Listof Symbol)) (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
-<<<<<<< HEAD
-=======
+
 (: map-values (∀ (A B C) (→ (→ A (Values B C)) (Listof A) (Values (Listof B) (Listof C)))))
 (define map-values
     (λ (f ls)
@@ -241,7 +240,6 @@
           
           
           
->>>>>>> 5b1aee7e2a75de5ee31b40d5fa01316769676a55
 
 ;; TESTS
 
