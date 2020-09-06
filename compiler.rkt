@@ -170,11 +170,11 @@
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
-(define (assign-homes-exp e)
+(define (assign-homes-exp e ls)
   (match e
     [(Reg reg) (Reg reg)]
     [(Imm int) (Imm int)]
-    [(Var v) (Deref 'rpb -8)]
+    [(Var v) (Deref 'rbp -8)]
     [(Instr 'addq (list e1 e2)) (Instr 'addq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
     [(Instr 'subq (list e1 e2)) (Instr 'subq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
     [(Instr 'movq (list e1 e2)) (Instr 'movq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
@@ -196,8 +196,29 @@
 ;; Grant
 
 ;; patch-instructions : psuedo-x86 -> x86
+
+(define (patch-instructions-exp e)
+  (match e
+    [(Reg reg) (Reg reg)]
+    [(Imm int) (Imm int)]
+    [(Deref 'rbp x) (Deref 'rbp x)]
+    [(Instr 'addq (list e1 e2)) (cons (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
+    [(Instr 'subq (list e1 e2)) (cons (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
+    [(Instr 'movq (list e1 e2)) (cons (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
+    [(Instr 'negq (list e1)) (Instr 'negq (list e1))]
+    [(Callq l) (Callq l)]
+    [(Retq) (Retq)]
+    [(Instr 'pushq e1) (Instr 'pushq e1)]
+    [(Instr 'popq e1) (Instr 'popq e1)]
+    [(Block info es) (Block info (for/list ([e es]) (patch-instructions-exp e)))]
+    ))
+
 (define (patch-instructions p)
-  (error "TODO: code goes here (patch-instructions)"))
+  (match p
+    [(Program info (CFG es)) (Program info (CFG (for/list ([(list l b) es]) (list l (patch-instructions-exp b)))))]
+    ))
+
+;;  (error "TODO: code goes here (patch-instructions)"))
 
 ;; Grant
 
@@ -206,4 +227,3 @@
   (error "TODO: code goes here (print-x86)"))
 
 ;;Grant
-
