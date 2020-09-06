@@ -8,7 +8,7 @@
   (case mode
     [(#t) write]
     [(#f) display]
-    [else (lambda (p (port : Output-Port)) (print p port mode))]))
+    [else (λ (p (port : Output-Port)) (print p port mode))]))
 
 (: newline-and-indent (→ Output-Port (U Integer False) Index))
 (define (newline-and-indent port col)
@@ -182,12 +182,76 @@
               (let [(not-found : (→ (Listof Symbol)) (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
-#|(: remove-complex-opera* (→ R1 R1))
+<<<<<<< HEAD
+=======
+(: map-values (∀ (A B C) (→ (→ A (Values B C)) (Listof A) (Values (Listof B) (Listof C)))))
+(define map-values
+    (λ (f ls)
+      (cond
+        [(empty? ls)
+         (values '() '())]
+        [(cons? ls) (define-values (v1 v2) (f (car ls)))
+                    (define-values (ls1 ls2) (map-values f (cdr ls)))
+                    (values (cons v1 ls1) (cons v2 ls2))])))
+
+(: remove-complex-opera* (→ R1 R1))
 (define remove-complex-opera*
-  ...)
-|#
+  (λ (p)
+    (match p
+      [(Program info e)
+       (Program info (rco-exp e))])))
+
+(: rco-atom (→ Exp (Values Exp (Listof (Pairof Symbol Exp)))))
+(define rco-atom
+  (λ (e)
+    (match e
+      [(Var x) (values e '())]
+      [(Int n) (values e '())]
+      [(Let x e body)
+       (let ([v : Symbol (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
+      [(Prim op es)
+       (map-values (λ ([exp : Exp]) (rco-atom exp)) es)])))
+
+(: rco-exp (→ Exp Exp))
+(define rco-exp
+  (λ (e)
+    (match e
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Let x e body) (Let x e (rco-exp body))]
+      [(Prim op es)
+       (foldr
+        (λ ([elem : Exp] [acc : Exp])
+          (call-with-values
+           (λ () (rco-atom elem))
+           (λ ([exp : Exp] [vars : (Listof (Pairof Symbol Exp))])
+             (foldr
+              (λ ([_ : Exp] [v : (Pairof Symbol Exp)])
+                (Let (car v) (cdr v) _))
+              exp
+              vars))))
+        (Prim op '())
+        es)])))
+
+
+
+          
+          
+          
+>>>>>>> 5b1aee7e2a75de5ee31b40d5fa01316769676a55
 
 ;; TESTS
+
+#;(define process-exp
+  (λ (e)
+    (match e
+      [(Var x) ...]
+      [(Int n) ...]
+      [(Let x e body) ...]
+      [(Prim op es) ...])))
 
 (define p1 (Program (init-env)
                     (Prim '+
