@@ -216,17 +216,17 @@
     [(Deref 'rbp x) (Deref 'rbp x)]
     [(Instr 'addq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
+       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
        [(list x y) (Instr 'addq (list e1 e2))]
        )]
     [(Instr 'subq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (cons (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
+       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
        [(list x y) (Instr 'subq (list e1 e2))]
        )]
     [(Instr 'movq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (cons (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
+       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
        [(list x y) (Instr 'movq (list e1 e2))]
        )]
     [(Instr 'negq (list e1)) (Instr 'negq (list e1))]
@@ -243,7 +243,7 @@
     ))
 
 ;;TEST
-;;(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
+(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
 
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
