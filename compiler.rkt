@@ -111,10 +111,6 @@
 
 ;; Sam
 
-(struct Explic
-  (c0tail let-binds)
-  #:transparent)
-
 ; explicate-tail : R1 -> C0Tail x [Var]
 ; takes in R1 expression and produces C0 Tail and list of let-bound variables
 (define (explicate-tail r1exp)
@@ -128,14 +124,11 @@
     [(Prim '+ (list e1 e2))
      (values (Return (Prim '+ (list e1 e2))) '())] 
     [(Var x)
-     (values (Return (Var x)) '())] ; is the list right?
-    [(Let x e body) #;(define rec (explicate-tail body))
-                    (define-values (c0tail let-binds) (explicate-tail body))
-                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
-                    (values c0tail^ (cons x (append let-binds let-binds^)))
-                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
-                    #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
-                            (cons x (Explic-let-binds rec)))])) ; this feels close... wrap in values? arity error
+     (values (Return (Var x)) '())]
+    [(Let x e body) 
+     (define-values (c0tail let-binds) (explicate-tail body))
+     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+     (values c0tail^ (cons x (append let-binds let-binds^)))]))
 
 
 ; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
@@ -156,20 +149,69 @@
              '())] 
     [(Var x)
      (values (Seq (Assign v (Var x)) c) '())]
-    [(Let x e body) #;(define rec (explicate-assign body v c))
-                    (define-values (c0tail let-binds) (explicate-assign body v c))
-                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
-                    (values c0tail^ (cons x (append let-binds let-binds^)))
-                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
-                    #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
-                            (cons x (Explic-let-binds rec)))])) ; wrap in values... arity error
+    [(Let x e body) 
+     (define-values (c0tail let-binds) (explicate-assign body v c))
+     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+     (values c0tail^ (cons x (append let-binds let-binds^)))]))
 
 ;; explicate-control : R1 -> C0
-#;(define (explicate-control p)
+(define (explicate-control p)
   (match p
-  [(Program info e)
-  (Program info ())])
-  #;(error "TODO: code goes here (explicate-control)"))
+    [(Program info e)
+     (define-values (c0t let-binds) (explicate-tail e))
+     (Program (cons (cons 'locals let-binds) info) (CFG (list (cons 'start c0t))))]))
+
+(define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
+
+;; todo: more testing!
+
+; atm? : c0exp -> bool
+
+(define (atm? c0exp)
+    (match c0exp
+      [(Int n) true]
+      [(Var x) true]
+      [_ false]))
+
+; sel-ins-atm : C0atm -> pseudo-x86
+; takes in a c0 atom and converts to pseudo-x86
+
+(define (sel-ins-atm c0a)
+  (match c0a
+    [(Int n) (Imm n)]
+    [(Var x) (Var x)]))
+
+; sel-ins-stmt : C0stmt -> pseudo-x86
+; takes in a c0 statement and converts to pseudo-x86
+
+(define (sel-ins-stmt c0stmt)
+  (match c0stmt
+    [(Assign v e)
+     (if (atm? e)
+         (list (Instr 'movq (list e v)))
+         (match e
+           [(Prim 'read '())
+            (list (Callq 'read_int)
+                  (Instr 'movq (list (Reg 'rax) v)))]
+           [(Prim '- (list atm))
+            (define x86atm (sel-ins-atm atm))
+            (if (equal? x86atm v)
+                (list (Instr 'negq (list v)))
+                (list (Instr 'movq (list x86atm v))
+                      (Instr 'negq (list v))))]
+           [(Prim '+ (list atm1 atm2))
+            (define x86atm1 (sel-ins-atm atm1))
+            (define x86atm2 (sel-ins-atm atm2))
+            (cond [(equal? x86atm1 v) (list (Instr 'addq (list x86atm2 v)))]
+                  [(equal? x86atm2 v) (list (Instr 'addq (list x86atm1 v)))]
+                  [else (list (Instr 'movq (list x86atm1 v))
+                              (Instr 'addq (list x86atm2 v)))])]))]))
+
+; sel-ins-tail : C0tail -> pseudo-x86
+; takes in a c0 tail and converts it ot pseudo-x86
+
+
+
 
 ;; select-instructions : C0 -> pseudo-x86
 (define (select-instructions p)
