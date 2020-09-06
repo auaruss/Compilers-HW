@@ -169,13 +169,41 @@
 ;; /Sam
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
+
+(define (assign-homes-exp e)
+  (match e
+    [(Reg reg) (Reg reg)]
+    [(Imm int) (Imm int)]
+    [(Var v) (Deref 'rpb -8)]
+    [(Instr 'addq (list e1 e2)) (Instr 'addq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
+    [(Instr 'subq (list e1 e2)) (Instr 'subq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
+    [(Instr 'movq (list e1 e2)) (Instr 'movq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
+    [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1)))]
+    [(Callq l) (Callq l)]
+    [(Retq) (Retq)]
+    [(Instr 'pushq e1) (Instr 'pushq e1)]
+    [(Instr 'popq e1) (Instr 'popq e1)]
+    [(Block info es) (Block info (for/list ([e es]) (assign-homes-exp e)))]
+    ))
+
 (define (assign-homes p)
-  (error "TODO: code goes here (assign-homes)"))
+  (match p
+    [(Program info (CFG es)) (Program info (CFG (for/list ([(list l b) es]) (list l (assign-homes-exp b)))))]
+    ))
+
+;;  (error "TODO: code goes here (assign-homes)"))
+
+;; Grant
 
 ;; patch-instructions : psuedo-x86 -> x86
 (define (patch-instructions p)
   (error "TODO: code goes here (patch-instructions)"))
 
+;; Grant
+
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (error "TODO: code goes here (print-x86)"))
+
+;;Grant
+
