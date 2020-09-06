@@ -243,6 +243,8 @@
 
 
 
+#|
+
 (: patch-instructions (→ R1 R1))
 (define patch-instructions
   (λ (p)
@@ -265,7 +267,7 @@
                 ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
         [(Prim op es)
          (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]))))
-          
+|#          
           
           
 
