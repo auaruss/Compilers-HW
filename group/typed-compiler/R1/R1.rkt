@@ -97,6 +97,12 @@
 
 (define-type SymbolTable (Immutable-HashTable Symbol (Listof Symbol)))
 
+;;pseudo x86
+
+
+
+;;
+
 ;(define-type Arg (U Int Var))
 
 (: interp-exp (→ Env (→ Exp Val)))
@@ -237,6 +243,28 @@
 
 
 
+(: patch-instructions (→ R1 R1))
+(define patch-instructions
+  (λ (p)
+    (match p
+      [(Program info e)
+       (Program info ((patch-instructions-exp (init-symbol-table)) e))])))
+
+(: patch-instructions-exp (→ SymbolTable (→ Exp Exp)))
+(define patch-instructions-exp
+  (λ (symtab)
+    (λ (exp)
+      (match exp
+        [(Var x)
+         (Var (symbol-table-lookup symtab x))]
+        [(Int n) (Int n)]
+        [(Let x e body)
+         (let ([new-x : Symbol (gensym x)]) 
+           (Let new-x
+                ((uniquify-exp symtab) e)
+                ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
+        [(Prim op es)
+         (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]))))
           
           
           
