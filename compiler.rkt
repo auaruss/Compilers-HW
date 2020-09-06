@@ -128,14 +128,11 @@
     [(Prim '+ (list e1 e2))
      (values (Return (Prim '+ (list e1 e2))) '())] 
     [(Var x)
-     (values (Return (Var x)) '())] ; is the list right?
-    [(Let x e body) #;(define rec (explicate-tail body))
-                    (define-values (c0tail let-binds) (explicate-tail body))
-                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
-                    (values c0tail^ (cons x (append let-binds let-binds^)))
-                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
-                    #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
-                            (cons x (Explic-let-binds rec)))])) ; this feels close... wrap in values? arity error
+     (values (Return (Var x)) '())]
+    [(Let x e body) 
+     (define-values (c0tail let-binds) (explicate-tail body))
+     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+     (values c0tail^ (cons x (append let-binds let-binds^)))]))
 
 
 ; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
@@ -156,20 +153,21 @@
              '())] 
     [(Var x)
      (values (Seq (Assign v (Var x)) c) '())]
-    [(Let x e body) #;(define rec (explicate-assign body v c))
-                    (define-values (c0tail let-binds) (explicate-assign body v c))
-                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
-                    (values c0tail^ (cons x (append let-binds let-binds^)))
-                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
-                    #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
-                            (cons x (Explic-let-binds rec)))])) ; wrap in values... arity error
+    [(Let x e body) 
+     (define-values (c0tail let-binds) (explicate-assign body v c))
+     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+     (values c0tail^ (cons x (append let-binds let-binds^)))]))
 
 ;; explicate-control : R1 -> C0
-#;(define (explicate-control p)
+(define (explicate-control p)
   (match p
-  [(Program info e)
-  (Program info ())])
-  #;(error "TODO: code goes here (explicate-control)"))
+    [(Program info e)
+     (define-values (c0t let-binds) (explicate-tail e))
+     (Program (cons (cons 'locals let-binds) info) (CFG (list (cons 'start c0t))))]))
+
+(define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
+
+;; todo: more testing!
 
 ;; select-instructions : C0 -> pseudo-x86
 (define (select-instructions p)
