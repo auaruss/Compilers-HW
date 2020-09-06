@@ -128,10 +128,12 @@
     [(Prim '+ (list e1 e2))
      (values (Return (Prim '+ (list e1 e2))) '())] 
     [(Var x)
-     (values (Return (Var x)) '(x))] ; is the list right?
+     (values (Return (Var x)) '())] ; is the list right?
     [(Let x e body) #;(define rec (explicate-tail body))
                     (define-values (c0tail let-binds) (explicate-tail body))
-                    (values (explicate-assign e (Var x) c0tail) (cons x let-binds))
+                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+                    (values c0tail^ (cons x (append let-binds let-binds^)))
+                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
                     #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
                             (cons x (Explic-let-binds rec)))])) ; this feels close... wrap in values? arity error
 
@@ -153,10 +155,12 @@
      (values (Seq (Assign v (Prim '+ (list e1 e2))) c)
              '())] 
     [(Var x)
-     (values (Seq (Assign v (Var x)) c) '(x))]
+     (values (Seq (Assign v (Var x)) c) '())]
     [(Let x e body) #;(define rec (explicate-assign body v c))
                     (define-values (c0tail let-binds) (explicate-assign body v c))
-                    (values (explicate-assign e (Var x) c0tail) (cons x let-binds))
+                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+                    (values c0tail^ (cons x (append let-binds let-binds^)))
+                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
                     #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
                             (cons x (Explic-let-binds rec)))])) ; wrap in values... arity error
 
