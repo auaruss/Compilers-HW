@@ -111,24 +111,31 @@
 
 ;; Sam
 
+(struct Explic
+  (c0tail let-binds)
+  #:transparent)
+
 ; explicate-tail : R1 -> C0Tail x [Var]
 ; takes in R1 expression and produces C0 Tail and list of let-bound variables
 (define (explicate-tail r1exp)
   (match r1exp
-    [(Int n) (values (Return (Int n)) '())]
+    [(Int n)
+     (values (Return (Int n)) '())]
     [(Prim 'read '())
      (values (Return (Prim 'read '())) '())]
     [(Prim '- (list e))
-     #;(define-values (c0t let-binds) (explicate-tail e))
-     (values (Return (Prim '- (list e))) '() #;let-binds)] ; do i need this recursion
+     (values (Return (Prim '- (list e))) '())]
     [(Prim '+ (list e1 e2))
-     #;(define-values (c0t1 let-binds1) (explicate-tail e1))
-     #;(define-values (c0t2 let-binds2) (explicate-tail e2))
-     (values (Return (Prim '+ (list e1 e2))) '() #;(append let-binds1 let-binds2))] ; or here ?
-    [(Var x) (values (Return (Var x)) '(x))] ; is the list right?
-    [(Let x e body) (define-values (c0t let-binds) (explicate-tail body))
-                    (explicate-assign e (Var x) c0t)
-                    #;(cons x let-binds)])) ; this feels close... wrap in values? arity error
+     (values (Return (Prim '+ (list e1 e2))) '())] 
+    [(Var x)
+     (values (Return (Var x)) '())] ; is the list right?
+    [(Let x e body) #;(define rec (explicate-tail body))
+                    (define-values (c0tail let-binds) (explicate-tail body))
+                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+                    (values c0tail^ (cons x (append let-binds let-binds^)))
+                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
+                    #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
+                            (cons x (Explic-let-binds rec)))])) ; this feels close... wrap in values? arity error
 
 
 ; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
@@ -137,23 +144,25 @@
 
 (define (explicate-assign r1exp v c)
   (match r1exp
-    [(Int n) (values (Seq (Assign v (Int n)) c) '())]
+    [(Int n)
+     (values (Seq (Assign v (Int n)) c) '())]
     [(Prim 'read '())
      (values (Seq (Assign v (Prim 'read '())) c) '())]
     [(Prim '- (list e))
-     #;(define-values (c0t let-binds) (explicate-tail e))
      (values (Seq (Assign v (Prim '- (list e))) c)
-             '()#;let-binds)] ; do i need this recursion
+             '())] 
     [(Prim '+ (list e1 e2))
-     #;(define-values (c0t1 let-binds1) (explicate-tail e1))
-     #;(define-values (c0t2 let-binds2) (explicate-tail e2))
      (values (Seq (Assign v (Prim '+ (list e1 e2))) c)
-             '()
-             #;(append let-binds1 let-binds2))] ; or here ?
-    [(Var x) (values (Seq (Assign v (Var x)) c) '(x))]
-    [(Let x e body) (define-values (c0t let-binds) (explicate-assign body v c))
-                    (explicate-assign e (Var x) c0t)
-                    #;(cons x let-binds)])) ; wrap in values... arity error
+             '())] 
+    [(Var x)
+     (values (Seq (Assign v (Var x)) c) '())]
+    [(Let x e body) #;(define rec (explicate-assign body v c))
+                    (define-values (c0tail let-binds) (explicate-assign body v c))
+                    (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+                    (values c0tail^ (cons x (append let-binds let-binds^)))
+                    #;(values (explicate-assign e (Var x) c0tail) (cons x let-binds))
+                    #;(Explic (explicate-assign e (Var x) (Explic-c0tail rec))
+                            (cons x (Explic-let-binds rec)))])) ; wrap in values... arity error
 
 ;; explicate-control : R1 -> C0
 #;(define (explicate-control p)
