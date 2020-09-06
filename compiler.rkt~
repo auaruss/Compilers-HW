@@ -72,8 +72,7 @@
          (Var (symbol-table-lookup symtab x))]
         [(Int n) (Int n)]
         [(Let x e body)
-         (let ([new-x ;: Symbol
-                (gensym x)]) 
+         (let ([new-x : Symbol (gensym x)]) 
            (Let new-x
                 ((uniquify-exp symtab) e)
                 ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
@@ -83,8 +82,7 @@
 
 (define init-symbol-table
   (λ ()
-    (let ([init ;: (Immutable-HashTable Symbol (Listof Symbol))
-           (make-immutable-hash)]) init)))
+    (let ([init : (Immutable-HashTable Symbol (Listof Symbol)) (make-immutable-hash)]) init)))
 
 (define symbol-table-lookup
   (λ (symtab x)
@@ -94,8 +92,7 @@
   (λ (symtab x new-x)
     (dict-set symtab
               x
-              (let [(not-found ;: (→ (Listof Symbol))
-                     (λ () '()))]
+              (let [(not-found : (→ (Listof Symbol)) (λ () '()))]
                 (cons new-x (dict-ref symtab x not-found))))))
 
 ;; uniquify : R1 -> R1
@@ -115,45 +112,22 @@
 ; takes in R1 expression and produces C0 Tail and list of let-bound variables
 (define (explicate-tail r1exp)
   (match r1exp
-    [(Int n) (values (Return (Int n)) '())]
+    [(Int n) (values (Return (Int n))
+             '()]
     [(Prim 'read '())
-     (values (Return (Prim 'read '())) '())]
+    ...]
     [(Prim '- (list e))
-     #;(define-values (c0t let-binds) (explicate-tail e))
-     (values (Return (Prim '- (list e))) '() #;let-binds)] ; do i need this recursion
+    ...]
     [(Prim '+ (list e1 e2))
-     #;(define-values (c0t1 let-binds1) (explicate-tail e1))
-     #;(define-values (c0t2 let-binds2) (explicate-tail e2))
-     (values (Return (Prim '+ (list e1 e2))) '() #;(append let-binds1 let-binds2))] ; or here ?
-    [(Var x) (values (Return (Var x)) '(x))] ; is the list right?
-    [(Let x e body) (define-values (c0t let-binds) (explicate-tail body))
-                    (explicate-assign e (Var x) c0t)
-                    #;(cons x let-binds)])) ; this feels close... wrap in values? arity error
+    ...]
+    [(Var x) ...]
+    [(Let x e body)
+    ...]))
 
 
 ; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
 ; takes in R1 expression, the variable where it will be assigned, and a C0Tail that comes
 ; after the assignment. Returns a C0Tail and list of variables
-
-(define (explicate-assign r1exp v c)
-  (match r1exp
-    [(Int n) (values (Seq (Assign v (Int n)) c) '())]
-    [(Prim 'read '())
-     (values (Seq (Assign v (Prim 'read '())) c) '())]
-    [(Prim '- (list e))
-     #;(define-values (c0t let-binds) (explicate-tail e))
-     (values (Seq (Assign v (Prim '- (list e))) c)
-             '()#;let-binds)] ; do i need this recursion
-    [(Prim '+ (list e1 e2))
-     #;(define-values (c0t1 let-binds1) (explicate-tail e1))
-     #;(define-values (c0t2 let-binds2) (explicate-tail e2))
-     (values (Seq (Assign v (Prim '+ (list e1 e2))) c)
-             '()
-             #;(append let-binds1 let-binds2))] ; or here ?
-    [(Var x) (values (Seq (Assign v (Var x)) c) '(x))]
-    [(Let x e body) (define-values (c0t let-binds) (explicate-assign body v c))
-                    (explicate-assign e (Var x) c0t)
-                    #;(cons x let-binds)])) ; wrap in values... arity error
 
 ;; explicate-control : R1 -> C0
 #;(define (explicate-control p)
