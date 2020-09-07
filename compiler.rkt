@@ -165,6 +165,8 @@
 
 ;; todo: more testing!
 
+;; note: explicate-control passes all tests in run-tests.rkt
+
 ; atm? : c0exp -> bool
 
 (define (atm? c0exp)
@@ -220,8 +222,6 @@
      (define x86tail (sel-ins-tail tail))
      (append x86stmt x86tail)]))
 
-
-
 ;; select-instructions : C0 -> pseudo-x86
 (define (select-instructions p)
   (match p
@@ -230,6 +230,8 @@
 
 ;; I think this is right...
 ;; todo: check/test !
+
+;; note: select-instructions passes all tests in run-tests.rkt
 
 ;; /Sam
 
@@ -256,6 +258,8 @@
   (match p
     [(Program info (CFG es)) (Program info (CFG (for/list ([ls es]) (cons (car ls) (assign-homes-exp (cdr ls))))))]
     ))
+
+;; note: assign-homes passes all tests in run-tests.rkt
 
 ;;TEST
 ;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Imm 2))))))))))
@@ -301,7 +305,7 @@
     ))
 
 ;;TEST
-(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
+;(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
 
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
