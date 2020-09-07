@@ -72,8 +72,7 @@
          (Var (symbol-table-lookup symtab x))]
         [(Int n) (Int n)]
         [(Let x e body)
-         (let ([new-x ;: Symbol
-                (gensym x)]) 
+         (let ([new-x (gensym x)]) 
            (Let new-x
                 ((uniquify-exp symtab) e)
                 ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
@@ -83,17 +82,17 @@
 
 (define init-symbol-table
   (λ ()
-    (let (init (make-immutable-hash)) init)))
+    (let ([init (make-immutable-hash)]) init)))
 
 (define symbol-table-lookup
   (λ (symtab x)
-    (if (empty? (hash-ref x)) (error "variable not in scope") (car (hash-ref x)))))
+    (if (empty? (hash-ref symtab x)) (error "variable not in scope") (car (hash-ref symtab x)))))
 
 (define extend-symbol-table
   (λ (symtab x new-x)
     (hash-set symtab
               x
-              (let (not-found (λ () '()))
+              (let [(not-found (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
 ;; uniquify : R1 -> R1
@@ -204,6 +203,10 @@
 (define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
 (define r1program-let (Program '() given-let))
 
+(define new-let (Let 'x (Prim 'read '()) (Let 'y (Prim 'read '())
+                                              (Prim '+ (list (Var 'x) (Prim '- (list (Var 'y))))))))
+
+(define newprog (Program '() new-let))
 ;; todo: more testing!
 
 ;; note: explicate-control passes all tests in run-tests.rkt
