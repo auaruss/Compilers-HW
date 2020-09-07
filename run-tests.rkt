@@ -13,7 +13,7 @@
 ;; should be named "compiler.rkt"
 (define r1-passes
   `( ("uniquify" ,uniquify ,interp-R1)
-     #;("remove complex opera*" ,remove-complex-opera* ,interp-R1)
+     ("remove complex opera*" ,remove-complex-opera* ,interp-R1)
      #;("explicate control" ,explicate-control ,interp-C0)
      #;("instruction selection" ,select-instructions ,R1-interp-x86)
      #;("assign homes" ,assign-homes ,R1-interp-x86)
