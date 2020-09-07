@@ -117,60 +117,6 @@
                     (define-values (ls1 ls2) (map-values f (cdr ls)))
                     (values (cons v1 ls1) (cons v2 ls2))])))
 
-#;(define rco-atom
-  (λ (e)
-    (match e
-      [(Var x) (values e '())]
-      [(Int n) (values e '())]
-      [(Let x e body)
-       (let [(v : Symbol (gensym 'tmp))]
-                 (values
-                  (Var v)
-                  (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
-      [(Prim op es)
-       (define-values (exps syms) (map-values rco-atom es))
-       (values (Prim op exps)
-               syms)
-       #;(map-values (λ (exp) (rco-atom exp)) es)])))
-
-#;(define rco-atom
-  (λ (e)
-    (match e
-      [(Var x) (values e '())]
-      [(Int n) (values e '())]
-      [(Let x e body)
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
-      [(Prim op es)
-       (define-values (exps syms)
-         (map-values
-          (λ (e)
-            (if (or (Var? e) (Int? e))
-                (rco-atom e)
-                (let ([v (gensym 'tmp)])
-                  (define-values (_1 _2) (rco-atom e))
-                  (values (Var v)
-                          (cons (cons v _1) _2)))))
-          es))
-       (values (Prim op exps)
-               (append* syms))])))
-
-#;(define rco-exp
-  (λ (e)
-    (match e
-      [(Var x) (Var x)]
-      [(Int n) (Int n)]
-      [(Let x e body) (Let x e (rco-exp body))]
-      [(Prim op es)
-       (define-values (exps symbols) (map-values rco-atom es))
-       (foldr
-        (λ (elem acc)
-          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
-        (Prim op exps)
-        symbols)])))
-
 (define rco-atom
   (λ (e)
     (match e
@@ -192,8 +138,10 @@
                   (values (Var v)
                           (cons (cons v _1) _2)))))
           es))
-       (values (Prim op exps)
-               (append* syms))])))
+       (let ([v (gensym 'tmp)])
+         (values (Var v)
+                 (cons (cons v (Prim op exps)) (append* syms))))])))
+
 (define rco-exp
   (λ (e)
     (match e
@@ -202,7 +150,7 @@
       [(Let x e body) (Let x e (rco-exp body))]
       [(Prim op es)
        (define-values (exps symbols) (map-values rco-atom es))
-       (foldr
+       (foldl
         (λ (elem acc)
           (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
         (Prim op exps)
