@@ -275,7 +275,7 @@
 
 ;;TEST
 ;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Imm 2))))))))))
-(assign-homes (Program (list (cons 'locals (list (Var 'd) (Var 'v)))) (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v))))))))))
+;;(assign-homes (Program (list (cons 'locals (list (Var 'd) (Var 'v)))) (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v))))))))))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
@@ -325,6 +325,9 @@
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
-  (error "TODO: code goes here (print-x86)"))
+  (match p
+    [(Program info (CFG es)) '()]
+    ))
+;;  (error "TODO: code goes here (print-x86)"))
 
 ;;Grant
