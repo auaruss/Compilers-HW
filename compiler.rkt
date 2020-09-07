@@ -213,7 +213,8 @@
 (define (sel-ins-tail c0t)
   (match c0t
     [(Return e)
-     (sel-ins-stmt (Assign (Reg 'rax) e))]
+     (append (sel-ins-stmt (Assign (Reg 'rax) e))
+             (list (Jmp 'conclusion)))]
     [(Seq stmt tail)
      (define x86stmt (sel-ins-stmt stmt))
      (define x86tail (sel-ins-tail tail))
@@ -223,7 +224,12 @@
 
 ;; select-instructions : C0 -> pseudo-x86
 (define (select-instructions p)
-  (error "TODO: code goes here (select-instructions)"))
+  (match p
+    [(Program info (CFG es))
+     (Program info (CFG (for/list ([ls es]) (cons (car ls) (Block '() (sel-ins-tail (cdr ls)))))))]))
+
+;; I think this is right...
+;; todo: check/test !
 
 ;; /Sam
 
