@@ -238,33 +238,45 @@
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
-(define (assign-homes-exp e)
+(define (calc-stack-space ls)
+  (cond
+    [(null? ls) 0]
+    [else (+ 8 (calc-stack-space (cdr ls)))]
+    ))
+
+(define (find-index v ls)
+  (cond
+    [(eq? v (Var-name (car ls))) 1]
+    [else (add1 (find-index v (cdr ls)))]
+    ))
+
+(define (assign-homes-exp e ls)
   (match e
     [(Reg reg) (Reg reg)]
     [(Imm int) (Imm int)]
-    [(Var v) (Deref 'rbp -8)]
-    [(Instr 'addq (list e1 e2)) (Instr 'addq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
-    [(Instr 'subq (list e1 e2)) (Instr 'subq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
-    [(Instr 'movq (list e1 e2)) (Instr 'movq (list (assign-homes-exp e1) (assign-homes-exp e2)))]
+    [(Var v) (Deref 'rbp (* -8 (find-index v (cdr ls))))]
+    [(Instr 'addq (list e1 e2)) (Instr 'addq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
+    [(Instr 'subq (list e1 e2)) (Instr 'subq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
+    [(Instr 'movq (list e1 e2)) (Instr 'movq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
     [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1)))]
     [(Callq l) (Callq l)]
     [(Retq) (Retq)]
     [(Instr 'pushq e1) (Instr 'pushq e1)]
     [(Instr 'popq e1) (Instr 'popq e1)]
     [(Jmp e1) (Jmp e1)]
-    [(Block info es) (Block info (for/list ([e es]) (assign-homes-exp e)))]
+    [(Block info es) (Block info (for/list ([e es]) (assign-homes-exp e ls)))]
     ))
 
 (define (assign-homes p)
   (match p
-    [(Program info (CFG es)) (Program info (CFG (for/list ([ls es]) (cons (car ls) (assign-homes-exp (cdr ls))))))]
+    [(Program info (CFG es)) (Program (list (cons 'stack-space (calc-stack-space (cdr (car info))))) (CFG (for/list ([ls es]) (cons (car ls) (assign-homes-exp (cdr ls) (car info))))))]
     ))
 
 ;; note: assign-homes passes all tests in run-tests.rkt
 
 ;;TEST
 ;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Imm 2))))))))))
-;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Var 'v))))))))))
+(assign-homes (Program (list (cons 'locals (list (Var 'd) (Var 'v)))) (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v))))))))))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
