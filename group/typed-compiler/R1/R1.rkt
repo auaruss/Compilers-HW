@@ -207,7 +207,7 @@
       [(Var x) (values e '())]
       [(Int n) (values e '())]
       [(Let x e body)
-       (let (v : Symbol (gensym 'tmp)])
+       (let [(v : Symbol (gensym 'tmp))]
                  (values
                   (Var v)
                   (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
@@ -243,14 +243,14 @@
       [(Let x e body) ...]
       [(Prim op es) ...])))
 
-(define p1 (Program (init-env)
+(define p1 (Program '()
                     (Prim '+
                           (list (Int 2) (Int 3)))))
-(define p2 (Program (init-env)
+(define p2 (Program '()
                     (Prim '+
                           (list (Int 2) (Prim '- (list (Int 3)))))))
 
-(define p3 (Program (init-env)
+(define p3 (Program '()
                     (Let 'x
                          (Int 32)
                          (Prim '+
