@@ -106,7 +106,7 @@
 (define (remove-complex-opera* p)
     (match p
       [(Program info e)
-       (Program info (rco-exp e))])))
+       (Program info (rco-exp e))]))
 
 (define map-values
     (λ (f ls)
@@ -123,12 +123,24 @@
       [(Var x) (values e '())]
       [(Int n) (values e '())]
       [(Let x e body)
-       (let (v : Symbol (gensym 'tmp)])
+       (let ([v (gensym 'tmp)])
                  (values
                   (Var v)
-                  (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
+                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
       [(Prim op es)
-       (map-values (λ (exp) (rco-atom exp)) es)])))
+       (define-values (exps syms)
+         (map-values
+          (λ (e)
+            (if (or (Var? e) (Int? e))
+                (rco-atom e)
+                (let ([v (gensym 'tmp)])
+                  (define-values (_1 _2) (rco-atom e))
+                  (values (Var v)
+                          (cons (cons v _1) _2)))))
+          es))
+       (let ([v (gensym 'tmp)])
+         (values (Var v)
+                 (cons (cons v (Prim op exps)) (append* syms))))])))
 
 (define rco-exp
   (λ (e)
@@ -138,15 +150,13 @@
       [(Let x e body) (Let x e (rco-exp body))]
       [(Prim op es)
        (define-values (exps symbols) (map-values rco-atom es))
-       (foldr
+       (foldl
         (λ (elem acc)
-          (foldr
-           (λ (e a)
-             (if (empty? e) a (Let (car e) (cdr e) a)))
-           acc
-           elem))
-        (Prim op exps)
-        symbols)])))
+          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
+        (Prim op (reverse exps))
+        (append* symbols))])))
+
+(define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 
 ;; Sam
 
@@ -289,7 +299,8 @@
 
 (define (find-index v ls)
   (cond
-    [(eq? v (Var-name (car ls))) 1]
+    ;;[(eq? v (Var-name (car ls))) 1]
+    [(eq? v (car ls)) 1]
     [else (add1 (find-index v (cdr ls)))]
     ))
 
@@ -301,7 +312,7 @@
     [(Instr 'addq (list e1 e2)) (Instr 'addq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
     [(Instr 'subq (list e1 e2)) (Instr 'subq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
     [(Instr 'movq (list e1 e2)) (Instr 'movq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
-    [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1)))]
+    [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1 ls)))]
     [(Callq l) (Callq l)]
     [(Retq) (Retq)]
     [(Instr 'pushq e1) (Instr 'pushq e1)]
@@ -318,8 +329,8 @@
 ;; note: assign-homes passes all tests in run-tests.rkt
 
 ;;TEST
-;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Imm 2))))))))))
-;;(assign-homes (Program (list (cons 'locals (list (Var 'd) (Var 'v)))) (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v))))))))))
+;;(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y))) (Instr 'negq (list (Var 'y))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion))))))))
+;;(assign-homes (select-instructions (explicate-control r1program-let)))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
@@ -329,30 +340,28 @@
 
 (define (patch-instructions-exp e)
   (match e
-    [(Reg reg) (Reg reg)]
-    [(Imm int) (Imm int)]
-    [(Deref 'rbp x) (Deref 'rbp x)]
     [(Instr 'addq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
-       [(list x y) (Instr 'addq (list e1 e2))]
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr 'addq (list e1 e2)))]
        )]
     [(Instr 'subq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
-       [(list x y) (Instr 'subq (list e1 e2))]
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr 'subq (list e1 e2)))]
        )]
     [(Instr 'movq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
-       [(list x y) (Instr 'movq (list e1 e2))]
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr 'movq (list e1 e2)))]
        )]
-    [(Instr 'negq (list e1)) (Instr 'negq (list e1))]
-    [(Callq l) (Callq l)]
-    [(Retq) (Retq)]
-    [(Instr 'pushq e1) (Instr 'pushq e1)]
-    [(Instr 'popq e1) (Instr 'popq e1)]
-    [(Block info es) (Block info (for/list ([e es]) (patch-instructions-exp e)))]
+    [(Instr 'negq (list e1)) (list (Instr 'negq (list e1)))]
+    [(Callq l) (list (Callq l))]
+    [(Retq) (list (Retq))]
+    [(Instr 'pushq e1) (list (Instr 'pushq e1))]
+    [(Instr 'popq e1) (list (Instr 'popq e1))]
+    [(Jmp e1) (list (Jmp e1))]
+    [(Block info es) (Block info (append* (for/list ([e es]) (patch-instructions-exp e))))]
     ))
 
 (define (patch-instructions p)
@@ -361,11 +370,24 @@
     ))
 
 ;;TEST
-;(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
+;;(patch-instructions (assign-homes (select-instructions (explicate-control r1program-let))))
 
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
-;; Grant
+;; Grant/Sam
+
+(define x86prog (patch-instructions (assign-homes (select-instructions (explicate-control r1program-let)))))
+;x86prog
+
+
+Program (list (cons 'stack-space 16)
+              (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Deref 'rpb -16)))
+                                                       (Instr 'negq (list (Deref 'rpb -16)))
+                                                       (Instr 'movq (list (Deref 'rpb -16) (Reg 'rax)))
+                                                       (Instr 'movq (list (Reg 'rax) (Deref 'rpb -8)))
+                                                       (Instr 'movq (list (Deref 'rpb -8) (Reg 'rax)))
+                                                       (Instr 'negq (list (Reg 'rax)))
+                                                       (Jmp 'conclusion)))))))
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
@@ -374,4 +396,4 @@
     ))
 ;;  (error "TODO: code goes here (print-x86)"))
 
-;;Grant
+;;Grant/Sam
