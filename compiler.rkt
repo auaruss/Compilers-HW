@@ -379,9 +379,8 @@
 ;; note: assign-homes passes all tests in run-tests.rkt
 
 ;;TEST
-;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Imm 2))))))))))
 ;;(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y))) (Instr 'negq (list (Var 'y))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion))))))))
-(assign-homes (select-instructions (explicate-control r1program-let)))
+;;(assign-homes (select-instructions (explicate-control r1program-let)))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
@@ -391,30 +390,28 @@
 
 (define (patch-instructions-exp e)
   (match e
-    [(Reg reg) (Reg reg)]
-    [(Imm int) (Imm int)]
-    [(Deref 'rbp x) (Deref 'rbp x)]
     [(Instr 'addq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
-       [(list x y) (Instr 'addq (list e1 e2))]
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr 'addq (list e1 e2)))]
        )]
     [(Instr 'subq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
-       [(list x y) (Instr 'subq (list e1 e2))]
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr 'subq (list e1 e2)))]
        )]
     [(Instr 'movq (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (values (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
-       [(list x y) (Instr 'movq (list e1 e2))]
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr 'movq (list e1 e2)))]
        )]
-    [(Instr 'negq (list e1)) (Instr 'negq (list e1))]
-    [(Callq l) (Callq l)]
-    [(Retq) (Retq)]
-    [(Instr 'pushq e1) (Instr 'pushq e1)]
-    [(Instr 'popq e1) (Instr 'popq e1)]
-    [(Block info es) (Block info (for/list ([e es]) (patch-instructions-exp e)))]
+    [(Instr 'negq (list e1)) (list (Instr 'negq (list e1)))]
+    [(Callq l) (list (Callq l))]
+    [(Retq) (list (Retq))]
+    [(Instr 'pushq e1) (list (Instr 'pushq e1))]
+    [(Instr 'popq e1) (list (Instr 'popq e1))]
+    [(Jmp e1) (list (Jmp e1))]
+    [(Block info es) (Block info (append* (for/list ([e es]) (patch-instructions-exp e))))]
     ))
 
 (define (patch-instructions p)
@@ -423,7 +420,7 @@
     ))
 
 ;;TEST
-;(patch-instructions (assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v)))))))))))
+;;(patch-instructions (assign-homes (select-instructions (explicate-control r1program-let))))
 
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
