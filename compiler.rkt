@@ -162,6 +162,7 @@
      (Program (cons (cons 'locals let-binds) info) (CFG (list (cons 'start c0t))))]))
 
 (define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
+(define r1program-let (Program '() given-let))
 
 ;; todo: more testing!
 
