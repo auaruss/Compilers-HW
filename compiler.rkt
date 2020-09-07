@@ -104,7 +104,49 @@
 
 ;; remove-complex-opera* : R1 -> R1
 (define (remove-complex-opera* p)
-  (error "TODO: code goes here (remove-complex-opera*)"))
+    (match p
+      [(Program info e)
+       (Program info (rco-exp e))])))
+
+(define map-values
+    (λ (f ls)
+      (cond
+        [(empty? ls)
+         (values '() '())]
+        [(cons? ls) (define-values (v1 v2) (f (car ls)))
+                    (define-values (ls1 ls2) (map-values f (cdr ls)))
+                    (values (cons v1 ls1) (cons v2 ls2))])))
+
+(define rco-atom
+  (λ (e)
+    (match e
+      [(Var x) (values e '())]
+      [(Int n) (values e '())]
+      [(Let x e body)
+       (let (v : Symbol (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
+      [(Prim op es)
+       (map-values (λ (exp) (rco-atom exp)) es)])))
+
+(define rco-exp
+  (λ (e)
+    (match e
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Let x e body) (Let x e (rco-exp body))]
+      [(Prim op es)
+       (define-values (exps symbols) (map-values rco-atom es))
+       (foldr
+        (λ (elem acc)
+          (foldr
+           (λ (e a)
+             (if (empty? e) a (Let (car e) (cdr e) a)))
+           acc
+           elem))
+        (Prim op exps)
+        symbols)])))
 
 ;; Sam
 
@@ -327,6 +369,9 @@
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
-  (error "TODO: code goes here (print-x86)"))
+  (match p
+    [(Program info (CFG es)) '()]
+    ))
+;;  (error "TODO: code goes here (print-x86)"))
 
 ;;Grant
