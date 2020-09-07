@@ -106,7 +106,7 @@
 (define (remove-complex-opera* p)
     (match p
       [(Program info e)
-       (Program info (rco-exp e))])))
+       (Program info (rco-exp e))]))
 
 (define map-values
     (λ (f ls)
@@ -123,7 +123,7 @@
       [(Var x) (values e '())]
       [(Int n) (values e '())]
       [(Let x e body)
-       (let (v : Symbol (gensym 'tmp)])
+       (let [(v : Symbol (gensym 'tmp))]
                  (values
                   (Var v)
                   (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
@@ -150,11 +150,12 @@
             (if (or (Var? e) (Int? e))
                 (rco-atom e)
                 (let ([v (gensym 'tmp)])
+                  (define-values (_1 _2) (rco-atom e))
                   (values (Var v)
-                          (cons v (rco-atom e))))))
+                          (cons (cons v _1) _2)))))
           es))
        (values (Prim op exps)
-               syms)])))
+               (append* syms))])))
 
 (define rco-exp
   (λ (e)
@@ -166,11 +167,7 @@
        (define-values (exps symbols) (map-values rco-atom es))
        (foldr
         (λ (elem acc)
-          (foldr
-           (λ (e a)
-             (if (empty? e) a (Let (car e) (cdr e) a)))
-           acc
-           elem))
+          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
         (Prim op exps)
         symbols)])))
 
