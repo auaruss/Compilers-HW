@@ -210,6 +210,14 @@
 ; sel-ins-tail : C0tail -> pseudo-x86
 ; takes in a c0 tail and converts it ot pseudo-x86
 
+(define (sel-ins-tail c0t)
+  (match c0t
+    [(Return e)
+     (sel-ins-stmt (Assign (Reg 'rax) e))]
+    [(Seq stmt tail)
+     (define x86stmt (sel-ins-stmt stmt))
+     (define x86tail (sel-ins-tail tail))
+     (append x86stmt x86tail)]))
 
 
 
