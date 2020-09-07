@@ -97,12 +97,6 @@
 
 (define-type SymbolTable (Immutable-HashTable Symbol (Listof Symbol)))
 
-;;pseudo x86
-
-
-
-;;
-
 ;(define-type Arg (U Int Var))
 
 (: interp-exp (→ Env (→ Exp Val)))
@@ -188,7 +182,6 @@
               (let [(not-found : (→ (Listof Symbol)) (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
-
 (: map-values (∀ (A B C) (→ (→ A (Values B C)) (Listof A) (Values (Listof B) (Listof C)))))
 (define map-values
     (λ (f ls)
@@ -213,12 +206,12 @@
       [(Var x) (values e '())]
       [(Int n) (values e '())]
       [(Let x e body)
-       (let ([v : Symbol (gensym 'tmp)])
+       (let (v : Symbol (gensym 'tmp)])
                  (values
                   (Var v)
                   (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
       [(Prim op es)
-       (map-values (λ ([exp : Exp]) (rco-atom exp)) es)])))
+       (map-values (λ (exp) (rco-atom exp)) es)])))
 
 (: rco-exp (→ Exp Exp))
 (define rco-exp
@@ -228,48 +221,16 @@
       [(Int n) (Int n)]
       [(Let x e body) (Let x e (rco-exp body))]
       [(Prim op es)
+       (define-values (exps symbols) (map-values rco-atom es))
        (foldr
-        (λ ([elem : Exp] [acc : Exp])
-          (call-with-values
-           (λ () (rco-atom elem))
-           (λ ([exp : Exp] [vars : (Listof (Pairof Symbol Exp))])
-             (foldr
-              (λ ([_ : Exp] [v : (Pairof Symbol Exp)])
-                (Let (car v) (cdr v) _))
-              exp
-              vars))))
-        (Prim op '())
-        es)])))
-
-
-
-#|
-
-(: patch-instructions (→ R1 R1))
-(define patch-instructions
-  (λ (p)
-    (match p
-      [(Program info e)
-       (Program info ((patch-instructions-exp (init-symbol-table)) e))])))
-
-(: patch-instructions-exp (→ SymbolTable (→ Exp Exp)))
-(define patch-instructions-exp
-  (λ (symtab)
-    (λ (exp)
-      (match exp
-        [(Var x)
-         (Var (symbol-table-lookup symtab x))]
-        [(Int n) (Int n)]
-        [(Let x e body)
-         (let ([new-x : Symbol (gensym x)]) 
-           (Let new-x
-                ((uniquify-exp symtab) e)
-                ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
-        [(Prim op es)
-         (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]))))
-|#          
-          
-          
+        (λ (elem acc)
+          (foldr
+           (λ (e a)
+             (if (empty? e) a (Let (car e) (cdr e) a)))
+           acc
+           elem))
+        (Prim op exps)
+        symbols)])))
 
 ;; TESTS
 
