@@ -256,13 +256,30 @@
     (match e
       [(Var x) (values e '())]
       [(Int n) (values e '())]
-      [(Let x e body)
-       (let ([v : Symbol (gensym 'tmp)])
+      [(Prim 'read '())
+       (let ([v (gensym 'tmp)])
                  (values
                   (Var v)
-                  (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
+                  (list (cons v (Prim 'read '())))))]
+      [(Let x e body)
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
       [(Prim op es)
-       (map-values (λ ([exp : Exp]) (rco-atom exp)) es)])))
+       (define-values (exps syms)
+         (map-values
+          (λ (e)
+            (cond [(or (Var? e) (Int? e) (and (Prim? e) (eq? (Prim-op e) 'read)))
+                   (rco-atom e)]
+                  [else (let ([v (gensym 'tmp)])
+                          (define-values (_1 _2) (rco-atom e))
+                          (values (Var v)
+                                  (cons (cons v _1) _2)))]))
+          es))
+       (let ([v (gensym 'tmp)])
+         (values (Var v)
+                 (cons (cons v (Prim op exps)) (append* syms))))])))
 
 (: rco-exp (→ Exp Exp))
 (define rco-exp
@@ -273,15 +290,11 @@
       [(Let x e body) (Let x e (rco-exp body))]
       [(Prim op es)
        (define-values (exps symbols) (map-values rco-atom es))
-       (foldr
+       (foldl
         (λ (elem acc)
-          (foldr
-           (λ (e a)
-             (if (empty? e) a (Let (car e) (cdr e) a)))
-           acc
-           elem))
+          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
         (Prim op exps)
-        symbols)])))
+        (append* symbols))])))
 
 
 
@@ -344,3 +357,61 @@
 (remove-complex-opera* (uniquify p1))
 (remove-complex-opera* (uniquify p2))
 (remove-complex-opera* (uniquify p3))
+
+(define newprog
+  (Program '() (Prim '+ (list (Prim '- (list (Int 42))) (Int 2)))))
+
+
+(define plus1s
+  (Program '() (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Prim
+                '+
+                (list
+                 (Int 1)
+                 (Int 1)))))))))))))))))))))))
+
+
+(define reads
+  (Program '()
+   (Prim '+
+         (list
+          (Prim '-
+                (list
+                 (Prim 'read '())))
+          (Prim 'read '())))
+   ))
