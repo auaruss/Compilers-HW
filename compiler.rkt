@@ -156,6 +156,8 @@
         (Prim op exps)
         (append* symbols))])))
 
+(define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
+
 ;; Sam
 
 ; explicate-tail : R1 -> C0Tail x [Var]
