@@ -1,4 +1,4 @@
-#lang typed/racket/no-check
+#lang typed/racket
 (require racket/set)
 (require racket/stream)
 (require racket/fixnum)
@@ -84,8 +84,7 @@
 
 (struct Program [(info : Env)
                  (body : Exp)]
-  #:type-name R1
-  #:transparent)
+  #:type-name R1)
 
 (define-type Op (U 'read '+ '-))
 
