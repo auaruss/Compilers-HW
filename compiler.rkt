@@ -117,7 +117,7 @@
                     (define-values (ls1 ls2) (map-values f (cdr ls)))
                     (values (cons v1 ls1) (cons v2 ls2))])))
 
-(define rco-atom
+#;(define rco-atom
   (λ (e)
     (match e
       [(Var x) (values e '())]
@@ -128,7 +128,33 @@
                   (Var v)
                   (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
       [(Prim op es)
-       (map-values (λ (exp) (rco-atom exp)) es)])))
+       (define-values (exps syms) (map-values rco-atom es))
+       (values (Prim op exps)
+               syms)
+       #;(map-values (λ (exp) (rco-atom exp)) es)])))
+
+(define rco-atom
+  (λ (e)
+    (match e
+      [(Var x) (values e '())]
+      [(Int n) (values e '())]
+      [(Let x e body)
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
+      [(Prim op es)
+       (define-values (exps syms)
+         (map-values
+          (λ (e)
+            (if (or (Var? e) (Int? e))
+                (rco-atom e)
+                (let ([v (gensym 'tmp)])
+                  (values (Var v)
+                          (cons v (rco-atom e))))))
+          es))
+       (values (Prim op exps)
+               syms)])))
 
 (define rco-exp
   (λ (e)
