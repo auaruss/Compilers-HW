@@ -133,7 +133,7 @@
                syms)
        #;(map-values (λ (exp) (rco-atom exp)) es)])))
 
-(define rco-atom
+#;(define rco-atom
   (λ (e)
     (match e
       [(Var x) (values e '())]
@@ -157,7 +157,7 @@
        (values (Prim op exps)
                (append* syms))])))
 
-(define rco-exp
+#;(define rco-exp
   (λ (e)
     (match e
       [(Var x) (Var x)]
@@ -170,6 +170,43 @@
           (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
         (Prim op exps)
         symbols)])))
+
+(define rco-atom
+  (λ (e)
+    (match e
+      [(Var x) (values e '())]
+      [(Int n) (values e '())]
+      [(Let x e body)
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
+      [(Prim op es)
+       (define-values (exps syms)
+         (map-values
+          (λ (e)
+            (if (or (Var? e) (Int? e))
+                (rco-atom e)
+                (let ([v (gensym 'tmp)])
+                  (define-values (_1 _2) (rco-atom e))
+                  (values (Var v)
+                          (cons (cons v _1) _2)))))
+          es))
+       (values (Prim op exps)
+               (append* syms))])))
+(define rco-exp
+  (λ (e)
+    (match e
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Let x e body) (Let x e (rco-exp body))]
+      [(Prim op es)
+       (define-values (exps symbols) (map-values rco-atom es))
+       (foldr
+        (λ (elem acc)
+          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
+        (Prim op exps)
+        (append* symbols))])))
 
 ;; Sam
 
@@ -390,7 +427,7 @@
 
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
-;; Grant
+;; Grant/Sam
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
@@ -399,4 +436,4 @@
     ))
 ;;  (error "TODO: code goes here (print-x86)"))
 
-;;Grant
+;;Grant/Sam
