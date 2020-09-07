@@ -72,8 +72,7 @@
          (Var (symbol-table-lookup symtab x))]
         [(Int n) (Int n)]
         [(Let x e body)
-         (let ([new-x ;: Symbol
-                (gensym x)]) 
+         (let ([new-x (gensym x)]) 
            (Let new-x
                 ((uniquify-exp symtab) e)
                 ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
@@ -83,26 +82,24 @@
 
 (define init-symbol-table
   (λ ()
-    (let ([init ;: (Immutable-HashTable Symbol (Listof Symbol))
-           (make-immutable-hash)]) init)))
+    (let ([init (make-immutable-hash)]) init)))
 
 (define symbol-table-lookup
   (λ (symtab x)
-    (if (empty? (dict-ref x)) (error "variable not in scope") (car (dict-ref x)))))
+    (if (empty? (hash-ref symtab x)) (error "variable not in scope") (car (hash-ref symtab x)))))
 
 (define extend-symbol-table
   (λ (symtab x new-x)
-    (dict-set symtab
+    (hash-set symtab
               x
-              (let [(not-found ;: (→ (Listof Symbol))
-                     (λ () '()))]
-                (cons new-x (dict-ref symtab x not-found))))))
+              (let [(not-found (λ () '()))]
+                (cons new-x (hash-ref symtab x not-found))))))
 
 ;; uniquify : R1 -> R1
 (define (uniquify p)
   (match p
     [(Program info e)
-     (Program info ((uniquify-exp '()) e))]
+     (Program info ((uniquify-exp (init-symbol-table)) e))]
     ))
 
 ;; remove-complex-opera* : R1 -> R1
@@ -164,6 +161,10 @@
 (define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
 (define r1program-let (Program '() given-let))
 
+(define new-let (Let 'x (Prim 'read '()) (Let 'y (Prim 'read '())
+                                              (Prim '+ (list (Var 'x) (Prim '- (list (Var 'y))))))))
+
+(define newprog (Program '() new-let))
 ;; todo: more testing!
 
 ;; note: explicate-control passes all tests in run-tests.rkt
@@ -276,7 +277,7 @@
 
 ;;TEST
 ;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Imm 2))))))))))
-(assign-homes (Program (list (cons 'locals (list (Var 'd) (Var 'v)))) (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v))))))))))
+;;(assign-homes (Program (list (cons 'locals (list (Var 'd) (Var 'v)))) (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Var 'd) (Var 'v))))))))))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
