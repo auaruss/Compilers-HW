@@ -312,7 +312,8 @@
 
 (define (find-index v ls)
   (cond
-    [(eq? v (Var-name (car ls))) 1]
+    ;;[(eq? v (Var-name (car ls))) 1]
+    [(eq? v (car ls)) 1]
     [else (add1 (find-index v (cdr ls)))]
     ))
 
@@ -324,7 +325,7 @@
     [(Instr 'addq (list e1 e2)) (Instr 'addq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
     [(Instr 'subq (list e1 e2)) (Instr 'subq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
     [(Instr 'movq (list e1 e2)) (Instr 'movq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
-    [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1)))]
+    [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1 ls)))]
     [(Callq l) (Callq l)]
     [(Retq) (Retq)]
     [(Instr 'pushq e1) (Instr 'pushq e1)]
@@ -342,7 +343,8 @@
 
 ;;TEST
 ;;(assign-homes (Program '() (CFG (list (cons 'label (Block '() (list (Instr 'addq (list (Imm 10) (Imm 2))))))))))
-(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y)) (Instr 'negq (list (Var 'v))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion)))))))))
+;;(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y))) (Instr 'negq (list (Var 'y))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion))))))))
+(assign-homes (select-instructions (explicate-control r1program-let)))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
