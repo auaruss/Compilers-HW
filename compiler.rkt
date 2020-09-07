@@ -153,7 +153,7 @@
        (foldl
         (λ (elem acc)
           (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
-        (Prim op exps)
+        (Prim op (reverse exps))
         (append* symbols))])))
 
 (define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
@@ -375,6 +375,19 @@
 ;;  (error "TODO: code goes here (patch-instructions)"))
 
 ;; Grant/Sam
+
+(define x86prog (patch-instructions (assign-homes (select-instructions (explicate-control r1program-let)))))
+;x86prog
+
+
+Program (list (cons 'stack-space 16)
+              (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Deref 'rpb -16)))
+                                                       (Instr 'negq (list (Deref 'rpb -16)))
+                                                       (Instr 'movq (list (Deref 'rpb -16) (Reg 'rax)))
+                                                       (Instr 'movq (list (Reg 'rax) (Deref 'rpb -8)))
+                                                       (Instr 'movq (list (Deref 'rpb -8) (Reg 'rax)))
+                                                       (Instr 'negq (list (Reg 'rax)))
+                                                       (Jmp 'conclusion)))))))
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
