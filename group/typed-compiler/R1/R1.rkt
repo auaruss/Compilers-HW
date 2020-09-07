@@ -1,4 +1,4 @@
-#lang typed/racket
+#lang typed/racket/no-check
 (require racket/set)
 (require racket/stream)
 (require racket/fixnum)
@@ -16,6 +16,33 @@
     (newline port)
     (write-string lead port)
     ))
+
+(define (print-info info port mode)
+  (let ([recur (make-recur port mode)])
+    (for ([(label data) (in-dict info)])
+      (match label
+        ['locals
+         (write-string "locals:" port)
+         (newline port)
+         (cond [(dict? data)
+                (write-string "    " port)
+                (for ([(var type) (in-dict data)])
+                  (write-string (symbol->string var) port)
+                  (write-string " : " port)
+                  (recur type port)
+                  (write-string ", " port)
+                  )
+                (newline port)]
+               [else
+                (recur data port)
+                (newline port)])]
+        [else
+         (write-string (symbol->string label) port)
+         (write-string ":" port)
+         (newline port)
+         (recur data port)
+         (newline port)
+         ]))))
 
 (define-type Val Fixnum)
 
@@ -84,7 +111,24 @@
 
 (struct Program [(info : Env)
                  (body : Exp)]
-  #:type-name R1)
+  #:type-name R1
+  #:property
+  prop:custom-write
+  (λ [(p : Program)
+      (port : Output-Port)
+      (mode :(U Boolean One Zero))]
+    (let ([recur (make-recur port mode)])
+      (match p
+        [(Program info body)
+         (write-string "program:" port)
+         (newline port)
+         (print-info info port mode)
+         (cond [(list? body)
+                (for ([def body])
+                  (recur def port)
+                  (newline port))]
+               [else
+                (recur body port)])]))))
 
 (define-type Op (U 'read '+ '-))
 
@@ -96,6 +140,12 @@
 (define-type Env (Immutable-HashTable Symbol Val))
 
 (define-type SymbolTable (Immutable-HashTable Symbol (Listof Symbol)))
+
+;;pseudo x86
+
+
+
+;;
 
 ;(define-type Arg (U Int Var))
 
@@ -182,6 +232,7 @@
               (let [(not-found : (→ (Listof Symbol)) (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
+
 (: map-values (∀ (A B C) (→ (→ A (Values B C)) (Listof A) (Values (Listof B) (Listof C)))))
 (define map-values
     (λ (f ls)
@@ -206,12 +257,12 @@
       [(Var x) (values e '())]
       [(Int n) (values e '())]
       [(Let x e body)
-       (let (v : Symbol (gensym 'tmp)])
+       (let ([v : Symbol (gensym 'tmp)])
                  (values
                   (Var v)
                   (list (cons (gensym 'tmp) (Let x (rco-exp e) (rco-exp body))))))]
       [(Prim op es)
-       (map-values (λ (exp) (rco-atom exp)) es)])))
+       (map-values (λ ([exp : Exp]) (rco-atom exp)) es)])))
 
 (: rco-exp (→ Exp Exp))
 (define rco-exp
@@ -231,6 +282,36 @@
            elem))
         (Prim op exps)
         symbols)])))
+
+
+
+#|
+
+(: patch-instructions (→ R1 R1))
+(define patch-instructions
+  (λ (p)
+    (match p
+      [(Program info e)
+       (Program info ((patch-instructions-exp (init-symbol-table)) e))])))
+
+(: patch-instructions-exp (→ SymbolTable (→ Exp Exp)))
+(define patch-instructions-exp
+  (λ (symtab)
+    (λ (exp)
+      (match exp
+        [(Var x)
+         (Var (symbol-table-lookup symtab x))]
+        [(Int n) (Int n)]
+        [(Let x e body)
+         (let ([new-x : Symbol (gensym x)]) 
+           (Let new-x
+                ((uniquify-exp symtab) e)
+                ((uniquify-exp (extend-symbol-table symtab x new-x)) body)))]
+        [(Prim op es)
+         (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]))))
+|#          
+          
+          
 
 ;; TESTS
 
@@ -258,7 +339,8 @@
                                      (Int 10)
                                      (Var 'x))
                                 (Var 'x))))))
-(Program-body p3)
-((uniquify-exp (init-symbol-table)) (Program-body p3))
-((interp-exp (init-env)) (Program-body p3))
-((interp-exp (init-env)) ((uniquify-exp (init-symbol-table)) (Program-body p3)))
+
+
+(remove-complex-opera* (uniquify p1))
+(remove-complex-opera* (uniquify p2))
+(remove-complex-opera* (uniquify p3))
