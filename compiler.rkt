@@ -202,6 +202,60 @@
 
 (define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 
+;;Grant's messing around with rco
+
+(define (remove-complex-opera1* p)
+    (match p
+      [(Program info e)
+       (Program info (rco-exp1 e))]))
+
+(define rco-atom1
+  (λ (e)
+    (match e
+      [(Var x) (values e '())]
+      [(Int n) (values e '())]
+      [(Let x e body)
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons v (Let x (rco-exp1 e) (rco-exp1 body))))))]
+      [(Prim '+ (list e1 e2))
+       (define-values (x1 ls1) (rco-atom1 e1))
+       (define-values (x2 ls2) (rco-atom1 e2))
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (append (list (cons v (Prim '+ (list x1 x2)))) ls1 ls2)))]
+      [(Prim '- (list e1))
+       (define-values (x1 ls1) (rco-atom1 e1))
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (append (list (cons v (Prim '- (list x1)))) ls1)))]
+      [(Prim 'read '())
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons v (Prim 'read '())))))]
+      )))
+
+(define rco-exp1
+  (λ (e)
+    (match e
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Let x e body) (Let x e (rco-exp1 body))]
+      [(Prim op es)
+       (define-values (exps symbols) (map-values rco-atom1 es))
+       (foldl
+        (λ (elem acc)
+          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
+        (Prim op (reverse exps))
+        (append* symbols))])))
+
+;;(rco-exp1 (Prim '+ (list (Prim '- (list (Int 10))) (Int 4))))
+;;(remove-complex-opera1* (Program '() (Prim '+ (list (Prim '- (list (Int 10))) (Int 4)))))
+;(remove-complex-opera* (Program '() (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Int 1)))))))))
 ;; Sam
 
 ; explicate-tail : R1 -> C0Tail x [Var]
@@ -375,6 +429,8 @@
 ;;TEST
 ;;(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y))) (Instr 'negq (list (Var 'y))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion))))))))
 ;;(assign-homes (select-instructions (explicate-control r1program-let)))
+;;(let ([x (+ (read) (read))]) x)
+(remove-complex-opera* (uniquify (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x)))))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
@@ -424,7 +480,7 @@
 ;x86prog
 
 
-#;(Program (list (cons 'stack-space 16)
+#;(Program (list (cons 'stack-space 16))
               (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Deref 'rpb -16)))
                                                        (Instr 'negq (list (Deref 'rpb -16)))
                                                        (Instr 'movq (list (Deref 'rpb -16) (Reg 'rax)))
