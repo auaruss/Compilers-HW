@@ -385,6 +385,8 @@
 ;;TEST
 ;;(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y))) (Instr 'negq (list (Var 'y))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion))))))))
 ;;(assign-homes (select-instructions (explicate-control r1program-let)))
+;;(let ([x (+ (read) (read))]) x)
+(remove-complex-opera* (uniquify (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x)))))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
