@@ -487,7 +487,7 @@
                                                        (Jmp 'conclusion)))))))
 
 (define (main-str stacksize)
-  (format "\t.globl _main\nmain:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp start\n" stacksize)) ;; 16 is stack-space
+  (format "\t.globl main\nmain:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp start\n" stacksize)) ;; 16 is stack-space
 
 (define (concl-str stacksize)
   (format "conclusion:\n\taddq\t$~a, %rsp\n\tpopq\t%rbp\n\tretq" stacksize)) ;; stack-space
