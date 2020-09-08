@@ -117,7 +117,7 @@
                     (define-values (ls1 ls2) (map-values f (cdr ls)))
                     (values (cons v1 ls1) (cons v2 ls2))])))
 
-(define rco-atom
+#;(define rco-atom
   (λ (e)
     (match e
       [(Var x) (values e '())]
@@ -142,7 +142,7 @@
          (values (Var v)
                  (cons (cons v (Prim op exps)) (append* syms))))])))
 
-(define rco-exp
+#;(define rco-exp
   (λ (e)
     (match e
       [(Var x) (Var x)]
@@ -155,6 +155,50 @@
           (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
         (Prim op (reverse exps))
         (append* symbols))])))
+
+(define rco-atom
+  (λ (e)
+    (match e
+      [(Var x) (values e '())]
+      [(Int n) (values e '())]
+      [(Prim 'read '())
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons v (Prim 'read '())))))]
+      [(Let x e body)
+       (let ([v (gensym 'tmp)])
+                 (values
+                  (Var v)
+                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
+      [(Prim op es)
+       (define-values (exps syms)
+         (map-values
+          (λ (e)
+            (cond [(or (Var? e) (Int? e) (and (Prim? e) (eq? (Prim-op e) 'read)))
+                   (rco-atom e)]
+                  [else (let ([v (gensym 'tmp)])
+                          (define-values (_1 _2) (rco-atom e))
+                          (values (Var v)
+                                  (cons (cons v _1) _2)))]))
+          es))
+       (let ([v (gensym 'tmp)])
+         (values (Var v)
+                 (cons (cons v (Prim op exps)) (append* syms))))])))
+
+(define rco-exp
+  (λ (e)
+    (match e
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Let x e body) (Let x e (rco-exp body))]
+      [(Prim op es)
+       (define-values (exps symbols) (map-values rco-atom es))
+       (foldl
+        (λ (elem acc)
+          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
+        (Prim op exps)
+        (append* (reverse symbols)))])))
 
 (define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 
@@ -380,19 +424,72 @@
 ;x86prog
 
 
-Program (list (cons 'stack-space 16)
+#;(Program (list (cons 'stack-space 16)
               (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Deref 'rpb -16)))
                                                        (Instr 'negq (list (Deref 'rpb -16)))
                                                        (Instr 'movq (list (Deref 'rpb -16) (Reg 'rax)))
                                                        (Instr 'movq (list (Reg 'rax) (Deref 'rpb -8)))
                                                        (Instr 'movq (list (Deref 'rpb -8) (Reg 'rax)))
                                                        (Instr 'negq (list (Reg 'rax)))
-                                                       (Jmp 'conclusion)))))))
+                                                       (Jmp 'conclusion))))))))
+
+(define main-str
+  "\t.globl _main\nmain:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$16, %rsp\n\tjmp start\n") ;; 16 is stack-space
+
+(define concl-str
+  "conclusion:\n\taddq\t$16, %rsp\n\tpopq\t%rbp\n\tretq") ;; stack-space
+
+(define (stringify-arg arg)
+  (match arg
+    [(Imm n) (format "$~a" n)]
+    [(Reg r) (format "%~a" r)]
+    [(Deref r n) (format "~a(%~a)" n r)]))
+
+(define (stringify-in instr)
+  (match instr
+    [(Instr 'addq (list a1 a2))
+     (define st1 (stringify-arg a1))
+     (define st2 (stringify-arg a2))
+     (format "addq\t~a, ~a" st1 st2)]
+    [(Instr 'subq (list a1 a2))
+     (define st1 (stringify-arg a1))
+     (define st2 (stringify-arg a2))
+     (format "subq\t~a, ~a" st1 st2)]
+    [(Instr 'movq (list a1 a2))
+     (define st1 (stringify-arg a1))
+     (define st2 (stringify-arg a2))
+     (format "movq\t~a, ~a" st1 st2)]
+    [(Instr 'negq (list a))
+     (define st (stringify-arg a))
+     (format "negq\t~a" st)]
+    [(Callq lbl)
+     (format "callq\t~a" lbl)]
+    [(Retq) "retq"]
+    [(Instr 'pushq arg)
+     (define st (stringify-arg arg))
+     (format "pushq\t~a" st)]
+    [(Instr 'popq arg)
+     (define st (stringify-arg arg))
+     (format "popq\t~a" st)]
+    [(Jmp lbl)
+     (format "jmp\t~a" lbl)]))
+
+;; format-x86 : [instr] -> string
+(define (format-x86 ins)
+  (foldr (λ (f r) (string-append "\t" f "\n" r)) "" (map stringify-in ins))
+  #;(if (empty? ins)
+      "start:\n\tjmp\tconclusion"
+      (map)))
+     
+     ;(format "~a:\n\t" label)
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (match p
-    [(Program info (CFG es)) '()]
+    [(Program info (CFG es)) (format "start:\n~a~a~a"
+                                     (format-x86 (Block-instr* (cdr (car es))))
+                                     main-str
+                                     concl-str)]
     ))
 ;;  (error "TODO: code goes here (print-x86)"))
 
