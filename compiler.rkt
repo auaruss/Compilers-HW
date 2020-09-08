@@ -165,7 +165,7 @@
        (let ([v (gensym 'tmp)])
                  (values
                   (Var v)
-                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
+                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))] ;; rco-atom on body, no gensym
       [(Prim op es)
        (define-values (exps syms)
          (map-values
@@ -268,13 +268,15 @@
      (values (Return (Var x)) '())]
     [(Let x e body) 
      (define-values (c0tail let-binds) (explicate-tail body))
-     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
+     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail)) ;; why var here
      (values c0tail^ (cons x (append let-binds let-binds^)))]))
 
 
 ; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
 ; takes in R1 expression, the variable where it will be assigned, and a C0Tail that comes
 ; after the assignment. Returns a C0Tail and list of variables
+
+;; simplify
 
 (define (explicate-assign r1exp v c)
   (match r1exp
@@ -399,6 +401,9 @@
     [else (add1 (find-index v (cdr ls)))]
     ))
 
+;; simplify
+;; todo: FIX PUSHQ/POPQ
+
 (define (assign-homes-exp e ls)
   (match e
     [(Reg reg) (Reg reg)]
@@ -434,6 +439,8 @@
 ;; Grant
 
 ;; patch-instructions : psuedo-x86 -> x86
+
+;; todo: FIX PUSHQ/POPQ
 
 (define (patch-instructions-exp e)
   (match e
@@ -487,7 +494,8 @@
                                                        (Jmp 'conclusion)))))))
 
 (define (main-str stacksize)
-  (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp ~a\n" (label-name "main") (label-name "main") (align stacksize 16) (label-name "start"))) ;; 16 is stack-space
+  (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp ~a\n"
+          (label-name "main") (label-name "main") (align stacksize 16) (label-name "start"))) ;; 16 is stack-space
 
 (define (concl-str stacksize)
   (format "~a:\n\taddq\t$~a, %rsp\n\tpopq\t%rbp\n\tretq"
