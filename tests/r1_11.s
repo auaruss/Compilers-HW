@@ -199,7 +199,7 @@ start:
 	movq	$1, %rax
 	addq	-632(%rbp), %rax
 	jmp	conclusion
-	.globl _main
+	.globl main
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp

@@ -4,7 +4,7 @@ start:
 	movq	%rax, -16(%rbp)
 	movq	-16(%rbp), %rax
 	jmp	conclusion
-	.globl _main
+	.globl main
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp

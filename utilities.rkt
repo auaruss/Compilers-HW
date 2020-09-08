@@ -1522,7 +1522,7 @@ Changelog:
     (if (string? res)
 	(string=? res expected)
 	(string=? (number->string res) expected))
-    (equal? (with-input-from-string res read)
+    (equal? (with-input-from-string (number->string res) read)
             (with-input-from-string expected read))))
 
 ;; Use exponential backoff to poll/sleep until a timeout is reached.

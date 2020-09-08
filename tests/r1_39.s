@@ -9,7 +9,7 @@ start:
 	movq	$52, %rax
 	addq	-24(%rbp), %rax
 	jmp	conclusion
-	.globl _main
+	.globl main
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp

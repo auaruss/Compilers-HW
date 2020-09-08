@@ -2,7 +2,7 @@ start:
 	callq	read_int
 	movq	%rax, %rax
 	jmp	conclusion
-	.globl _main
+	.globl main
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp

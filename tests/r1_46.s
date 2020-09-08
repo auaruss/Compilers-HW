@@ -11,7 +11,7 @@ start:
 	movq	%rax, -40(%rbp)
 	movq	-40(%rbp), %rax
 	jmp	conclusion
-	.globl _main
+	.globl main
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp

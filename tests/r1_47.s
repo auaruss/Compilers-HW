@@ -9,7 +9,7 @@ start:
 	movq	-24(%rbp), %rax
 	negq	%rax
 	jmp	conclusion
-	.globl _main
+	.globl main
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp
