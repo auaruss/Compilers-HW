@@ -427,7 +427,7 @@
 ;;(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y))) (Instr 'negq (list (Var 'y))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion))))))))
 ;;(assign-homes (select-instructions (explicate-control r1program-let)))
 ;;(let ([x (+ (read) (read))]) x)
-(remove-complex-opera* (uniquify (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x)))))
+;(remove-complex-opera* (uniquify (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x)))))
 
 ;;  (error "TODO: code goes here (assign-homes)"))
 
@@ -487,10 +487,11 @@
                                                        (Jmp 'conclusion)))))))
 
 (define (main-str stacksize)
-  (format "\t.globl main\nmain:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp start\n" stacksize)) ;; 16 is stack-space
+  (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp ~a\n" (label-name "main") (label-name "main") (align stacksize 16) (label-name "start"))) ;; 16 is stack-space
 
 (define (concl-str stacksize)
-  (format "conclusion:\n\taddq\t$~a, %rsp\n\tpopq\t%rbp\n\tretq" stacksize)) ;; stack-space
+  (format "~a:\n\taddq\t$~a, %rsp\n\tpopq\t%rbp\n\tretq"
+          (label-name "conclusion") (align stacksize 16))) ;; stack-space
 
 (define (stringify-arg arg)
   (match arg
@@ -516,7 +517,7 @@
      (define st (stringify-arg a))
      (format "negq\t~a" st)]
     [(Callq lbl)
-     (format "callq\t~a" lbl)]
+     (format "callq\t~a" (label-name lbl))]
     [(Retq) "retq"]
     [(Instr 'pushq arg)
      (define st (stringify-arg arg))
@@ -525,7 +526,7 @@
      (define st (stringify-arg arg))
      (format "popq\t~a" st)]
     [(Jmp lbl)
-     (format "jmp\t~a" lbl)]))
+     (format "jmp\t~a" (label-name lbl))]))
 
 ;; format-x86 : [instr] -> string
 (define (format-x86 ins)
@@ -539,7 +540,8 @@
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (match p
-    [(Program info (CFG es)) (format "start:\n~a~a~a"
+    [(Program info (CFG es)) (format "~a:\n~a~a~a"
+                                     (label-name "start")
                                      (format-x86 (Block-instr* (cdr (car es))))
                                      (main-str (cdr (car info)))
                                      (concl-str (cdr (car info))))]
