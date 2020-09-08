@@ -161,11 +161,6 @@
     (match e
       [(Var x) (values e '())]
       [(Int n) (values e '())]
-      [(Prim 'read '())
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Prim 'read '())))))]
       [(Let x e body)
        (let ([v (gensym 'tmp)])
                  (values
@@ -175,7 +170,7 @@
        (define-values (exps syms)
          (map-values
           (λ (e)
-            (cond [(or (Var? e) (Int? e) (and (Prim? e) (eq? (Prim-op e) 'read)))
+            (cond [(or (Var? e) (Int? e))
                    (rco-atom e)]
                   [else (let ([v (gensym 'tmp)])
                           (define-values (_1 _2) (rco-atom e))
@@ -185,13 +180,12 @@
        (let ([v (gensym 'tmp)])
          (values (Var v)
                  (cons (cons v (Prim op exps)) (append* syms))))])))
-
 (define rco-exp
   (λ (e)
     (match e
       [(Var x) (Var x)]
       [(Int n) (Int n)]
-      [(Let x e body) (Let x e (rco-exp body))]
+      [(Let x e body) (Let x (rco-exp e) (rco-exp body))]
       [(Prim op es)
        (define-values (exps symbols) (map-values rco-atom es))
        (foldl
@@ -315,6 +309,9 @@
                                               (Prim '+ (list (Var 'x) (Prim '- (list (Var 'y))))))))
 
 (define newprog (Program '() new-let))
+
+(define asdf (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x))))
+
 ;; todo: more testing!
 
 ;; note: explicate-control passes all tests in run-tests.rkt
@@ -487,13 +484,13 @@
                                                        (Instr 'movq (list (Reg 'rax) (Deref 'rpb -8)))
                                                        (Instr 'movq (list (Deref 'rpb -8) (Reg 'rax)))
                                                        (Instr 'negq (list (Reg 'rax)))
-                                                       (Jmp 'conclusion))))))))
+                                                       (Jmp 'conclusion)))))))
 
-(define main-str
-  "\t.globl _main\nmain:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$16, %rsp\n\tjmp start\n") ;; 16 is stack-space
+(define (main-str stacksize)
+  (format "\t.globl _main\nmain:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp start\n" stacksize)) ;; 16 is stack-space
 
-(define concl-str
-  "conclusion:\n\taddq\t$16, %rsp\n\tpopq\t%rbp\n\tretq") ;; stack-space
+(define (concl-str stacksize)
+  (format "conclusion:\n\taddq\t$~a, %rsp\n\tpopq\t%rbp\n\tretq" stacksize)) ;; stack-space
 
 (define (stringify-arg arg)
   (match arg
@@ -544,8 +541,8 @@
   (match p
     [(Program info (CFG es)) (format "start:\n~a~a~a"
                                      (format-x86 (Block-instr* (cdr (car es))))
-                                     main-str
-                                     concl-str)]
+                                     (main-str (cdr (car info)))
+                                     (concl-str (cdr (car info))))]
     ))
 ;;  (error "TODO: code goes here (print-x86)"))
 
