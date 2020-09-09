@@ -117,45 +117,6 @@
                     (define-values (ls1 ls2) (map-values f (cdr ls)))
                     (values (cons v1 ls1) (cons v2 ls2))])))
 
-#;(define rco-atom
-  (λ (e)
-    (match e
-      [(Var x) (values e '())]
-      [(Int n) (values e '())]
-      [(Let x e body)
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))]
-      [(Prim op es)
-       (define-values (exps syms)
-         (map-values
-          (λ (e)
-            (if (or (Var? e) (Int? e))
-                (rco-atom e)
-                (let ([v (gensym 'tmp)])
-                  (define-values (_1 _2) (rco-atom e))
-                  (values (Var v)
-                          (cons (cons v _1) _2)))))
-          es))
-       (let ([v (gensym 'tmp)])
-         (values (Var v)
-                 (cons (cons v (Prim op exps)) (append* syms))))])))
-
-#;(define rco-exp
-  (λ (e)
-    (match e
-      [(Var x) (Var x)]
-      [(Int n) (Int n)]
-      [(Let x e body) (Let x e (rco-exp body))]
-      [(Prim op es)
-       (define-values (exps symbols) (map-values rco-atom es))
-       (foldl
-        (λ (elem acc)
-          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
-        (Prim op (reverse exps))
-        (append* symbols))])))
-
 (define rco-atom
   (λ (e)
     (match e
@@ -415,8 +376,8 @@
     [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1 ls)))]
     [(Callq l) (Callq l)]
     [(Retq) (Retq)]
-    [(Instr 'pushq e1) (Instr 'pushq e1)]
-    [(Instr 'popq e1) (Instr 'popq e1)]
+    [(Instr 'pushq (list e1)) (Instr 'pushq (list (assign-homes e1 ls)))]
+    [(Instr 'popq (list e1)) (Instr 'popq (list (assign-homes e1 ls)))]
     [(Jmp e1) (Jmp e1)]
     [(Block info es) (Block info (for/list ([e es]) (assign-homes-exp e ls)))]
     ))
@@ -434,7 +395,6 @@
 ;;(let ([x (+ (read) (read))]) x)
 ;(remove-complex-opera* (uniquify (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x)))))
 
-;;  (error "TODO: code goes here (assign-homes)"))
 
 ;; Grant
 
@@ -483,16 +443,6 @@
 (define x86prog (patch-instructions (assign-homes (select-instructions (explicate-control r1program-let)))))
 ;x86prog
 
-
-#;(Program (list (cons 'stack-space 16))
-              (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Deref 'rpb -16)))
-                                                       (Instr 'negq (list (Deref 'rpb -16)))
-                                                       (Instr 'movq (list (Deref 'rpb -16) (Reg 'rax)))
-                                                       (Instr 'movq (list (Reg 'rax) (Deref 'rpb -8)))
-                                                       (Instr 'movq (list (Deref 'rpb -8) (Reg 'rax)))
-                                                       (Instr 'negq (list (Reg 'rax)))
-                                                       (Jmp 'conclusion)))))))
-
 (define (main-str stacksize)
   (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp ~a\n"
           (label-name "main") (label-name "main") (align stacksize 16) (label-name "start"))) ;; 16 is stack-space
@@ -538,10 +488,7 @@
 
 ;; format-x86 : [instr] -> string
 (define (format-x86 ins)
-  (foldr (λ (f r) (string-append "\t" f "\n" r)) "" (map stringify-in ins))
-  #;(if (empty? ins)
-      "start:\n\tjmp\tconclusion"
-      (map)))
+  (foldr (λ (f r) (string-append "\t" f "\n" r)) "" (map stringify-in ins)))
      
      ;(format "~a:\n\t" label)
 
@@ -552,8 +499,6 @@
                                      (label-name "start")
                                      (format-x86 (Block-instr* (cdr (car es))))
                                      (main-str (cdr (car info)))
-                                     (concl-str (cdr (car info))))]
-    ))
-;;  (error "TODO: code goes here (print-x86)"))
+                                     (concl-str (cdr (car info))))]))
 
 ;;Grant/Sam
