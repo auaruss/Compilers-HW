@@ -1,5 +1,6 @@
 #lang racket
 (require racket/set racket/stream)
+(require racket/graph)
 (require racket/fixnum)
 (require "interp-R0.rkt")
 (require "interp-R1.rkt")
@@ -364,6 +365,21 @@
 
 ;; simplify
 ;; todo: FIX PUSHQ/POPQ
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; uncover-live
+
+;; build-interference
+
+;; allocate-registers
+
+;; color-graph : InterferenceGraph -> [Var] -> [(Var . Nat)]
+;; takes an intereference graph and a list of vars in program, returns mapping from var to color (Nat)
+
+
 
 (define (assign-homes-exp e ls)
   (match e
