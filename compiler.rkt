@@ -379,6 +379,8 @@
 ;; color-graph : InterferenceGraph -> [Var] -> [(Var . Nat)]
 ;; takes an intereference graph and a list of vars in program, returns mapping from var to color (Nat)
 
+;; interference graph from book example
+(define ig1 (unweighted-graph/undirected '((t z) (z y) (z w) (y w) (x w) (w v))))
 
 
 (define (assign-homes-exp e ls)
