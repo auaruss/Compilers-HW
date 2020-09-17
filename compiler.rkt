@@ -1,6 +1,6 @@
 #lang racket
 (require racket/set racket/stream)
-(require racket/graph)
+(require graph)
 (require racket/fixnum)
 (require "interp-R0.rkt")
 (require "interp-R1.rkt")
