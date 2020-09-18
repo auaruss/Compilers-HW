@@ -158,60 +158,6 @@
 
 (define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 
-;;Grant's messing around with rco
-
-(define (remove-complex-opera1* p)
-    (match p
-      [(Program info e)
-       (Program info (rco-exp1 e))]))
-
-(define rco-atom1
-  (λ (e)
-    (match e
-      [(Var x) (values e '())]
-      [(Int n) (values e '())]
-      [(Let x e body)
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Let x (rco-exp1 e) (rco-exp1 body))))))]
-      [(Prim '+ (list e1 e2))
-       (define-values (x1 ls1) (rco-atom1 e1))
-       (define-values (x2 ls2) (rco-atom1 e2))
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (append (list (cons v (Prim '+ (list x1 x2)))) ls1 ls2)))]
-      [(Prim '- (list e1))
-       (define-values (x1 ls1) (rco-atom1 e1))
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (append (list (cons v (Prim '- (list x1)))) ls1)))]
-      [(Prim 'read '())
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Prim 'read '())))))]
-      )))
-
-(define rco-exp1
-  (λ (e)
-    (match e
-      [(Var x) (Var x)]
-      [(Int n) (Int n)]
-      [(Let x e body) (Let x e (rco-exp1 body))]
-      [(Prim op es)
-       (define-values (exps symbols) (map-values rco-atom1 es))
-       (foldl
-        (λ (elem acc)
-          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
-        (Prim op (reverse exps))
-        (append* symbols))])))
-
-;;(rco-exp1 (Prim '+ (list (Prim '- (list (Int 10))) (Int 4))))
-;;(remove-complex-opera1* (Program '() (Prim '+ (list (Prim '- (list (Int 10))) (Int 4)))))
-;(remove-complex-opera* (Program '() (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Int 1)))))))))
 ;; Sam
 
 ; explicate-tail : R1 -> C0Tail x [Var]
@@ -418,37 +364,25 @@
 
 ;; patch-instructions : psuedo-x86 -> x86
 
-;; todo: FIX PUSHQ/POPQ
+(define (patch-instructions-instr px86instr)
+  (match px86instr
+    [(Instr op (list e1 e2)) 
+     (match (list e1 e2)
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr op (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr op (list e1 e2)))]
+       )]
+    [(Instr op (list e1)) (list (Instr op (list e1)))]
+    [i (list i)]
+    ))
 
-(define (patch-instructions-exp e)
-  (match e
-    [(Instr 'addq (list e1 e2)) 
-     (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
-       [(list x y) (list (Instr 'addq (list e1 e2)))]
-       )]
-    [(Instr 'subq (list e1 e2)) 
-     (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
-       [(list x y) (list (Instr 'subq (list e1 e2)))]
-       )]
-    [(Instr 'movq (list e1 e2)) 
-     (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
-       [(list x y) (list (Instr 'movq (list e1 e2)))]
-       )]
-    [(Instr 'negq (list e1)) (list (Instr 'negq (list e1)))]
-    [(Callq l) (list (Callq l))]
-    [(Retq) (list (Retq))]
-    [(Instr 'pushq e1) (list (Instr 'pushq e1))]
-    [(Instr 'popq e1) (list (Instr 'popq e1))]
-    [(Jmp e1) (list (Jmp e1))]
-    [(Block info es) (Block info (append* (for/list ([e es]) (patch-instructions-exp e))))]
+(define (patch-instructions-block px86block)
+  (match px86block
+    [(Block info es) (Block info (append* (for/list ([i es]) (patch-instructions-instr i))))]
     ))
 
 (define (patch-instructions p)
   (match p
-    [(Program info (CFG es)) (Program info (CFG (for/list ([ls es]) (cons (car ls) (patch-instructions-exp (cdr ls))))))]
+    [(Program info (CFG es)) (Program info (CFG (for/list ([ls es]) (cons (car ls) (patch-instructions-block (cdr ls))))))]
     ))
 
 ;;TEST

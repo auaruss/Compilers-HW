@@ -37,5 +37,5 @@
         all-tests)))
 
 (interp-tests "r1" #f r1-passes interp-R1 "r1" (tests-for "r1"))
-(compiler-tests "r1" #f r1-passes "r1" (tests-for "r1"))
+;;(compiler-tests "r1" #f r1-passes "r1" (tests-for "r1"))
 
