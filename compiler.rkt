@@ -376,11 +376,72 @@
 
 ;; allocate-registers
 
-;; color-graph : InterferenceGraph -> [Var] -> [(Var . Nat)]
-;; takes an intereference graph and a list of vars in program, returns mapping from var to color (Nat)
+;; get-longest : [List] -> List
+;; gets longest list in list of lists
+
+(define (get-longest ls)
+  (if (empty? ls)
+      '()
+      (if (>= (length (first ls))
+              (length (get-longest (rest ls))))
+          (first ls)
+          (get-longest (rest ls)))))
+
+;; get-longest-val : [Hash Any List] -> List
+;; get the longest value in hash
+
+(define (get-longest-val hash)
+  (let ([vals (hash-values hash)])
+    (get-longest vals)))
+
+;; choose-least : [Nat] Nat -> Nat
+;; returns the smallest Nat not in the given set
+
+(define (choose-least satset cand)
+  (if (empty? satset)
+      cand
+      (let ([m (apply min satset)])
+        (if (< cand m)
+            cand
+            (choose-least (remove m satset) (add1 cand))))))
+
+;; hash-key : [Hash Key Val] Val -> Key
+;; returns the (a) key that maps to given val
+
+(define (hash-key hash val)
+  (local
+    [(define (first-cdr ls v)
+        (if (empty? ls)
+            (error "val not found")
+            (if (equal? (cdr (car ls)) v)
+                (car (car ls))
+                (first-cdr (cdr ls) v))))]
+    (first-cdr (hash->list hash) val)))
+
+;; A SatSet is a set of nats (colors)
+
+;; color-graph : InterferenceGraph -> [Hash Var SatSet] -> [(Var . Nat)]
+;; takes an unweighted/undirected intereference graph and a mutable hashtable of vars to saturation sets
+;; in program, returns mapping from var to color (Nat)
 
 ;; interference graph from book example
 (define ig1 (unweighted-graph/undirected '((t z) (z y) (z w) (y w) (x w) (w v))))
+(define h1 (make-hash '((t . ()) (z . ()) (y . ()) (w . ()) (x . ()) (v . ()))))
+(define testhash (hash 't '(a e w) 'z '() 'y '(w q f f d) 'w '() 'x '(z a) 'v '(e)))
+
+(define (color-graph ig hash)
+  (if (hash-empty? hash)
+      empty
+      (let* ([maxsat (get-longest-val hash)]
+             [maxsat-vert (hash-key hash maxsat)]
+             [adj-verts (get-neighbors ig maxsat-vert)]
+             [col (choose-least maxsat 0)])
+        (for-each (λ (vert) (if (hash-has-key? hash vert)
+                                (hash-set! hash vert (cons col (hash-ref hash vert)))
+                                hash))
+                      adj-verts)
+        (hash-remove! hash maxsat-vert)
+        (cons `(,maxsat-vert . ,col) (color-graph ig hash)))))
 
 
 (define (assign-homes-exp e ls)
