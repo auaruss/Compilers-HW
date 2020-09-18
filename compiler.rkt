@@ -7,6 +7,8 @@
 (require "interp.rkt")
 (require "utilities.rkt")
 (provide (all-defined-out))
+(require racket/dict)
+(require racket/set)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -294,6 +296,54 @@
 
 ;; /Sam
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; uncover-live
+
+(define (instr-arg-varset arg) (list->set '()))
+
+(define (instr-read-varset instr) (list->set '()))
+
+(define (instr-written-varset instr) (list->set '()))
+
+(define (uncover-live-helper instr-ls live-after-set)
+  (cond
+    [(null? instr-ls) (list (list->set '()))]
+    [else (let ([new-live-after-set (set-union (set-subtract live-after-set (instr-written-varset (car instr-ls))) (instr-read-varset (car instr-ls)))]) 
+	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set) (list new-live-after-set)))]
+    ))
+
+
+(define (uncover-live p)
+  (match p
+    [(Program info (CFG es)) 
+     (Program info (CFG (for/list ([ls es]) (cons (car ls) (match (cdr ls)
+							     [(Block b-info instr-ls) 
+							      (Block (uncover-live-helper (reverse instr-ls) (list->set '())) instr-ls)])))))]
+    ))
+
+;;Test from book for uncover-live
+(define 3.2example (Let 'a (Int 5) (Let 'b (Int 30) (Let 'c (Var 'a) (Let 'b (Int 10) (Let 'c (Prim '+ (list (Var 'b) (Var 'c))) (Var 'c)))))))
+(define 3.2program (Program '() 3.2example))
+;;match case used to print the block's info
+#;(match (uncover-live (select-instructions (explicate-control 3.2program)))
+       [(Program info (CFG es))
+	(match (cdr (car es)) 
+	       [(Block b-info instr-ls) b-info])])
+
+;; build-interference
+
+;; allocate-registers
+
+;; color-graph : InterferenceGraph -> [Var] -> [(Var . Nat)]
+;; takes an intereference graph and a list of vars in program, returns mapping from var to color (Nat)
+
+;; interference graph from book example
+(define ig1 (unweighted-graph/undirected '((t z) (z y) (z w) (y w) (x w) (w v))))
+
+
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
 (define (calc-stack-space ls)
@@ -311,23 +361,6 @@
 
 ;; simplify
 ;; todo: FIX PUSHQ/POPQ
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; uncover-live
-
-;; build-interference
-
-;; allocate-registers
-
-;; color-graph : InterferenceGraph -> [Var] -> [(Var . Nat)]
-;; takes an intereference graph and a list of vars in program, returns mapping from var to color (Nat)
-
-;; interference graph from book example
-(define ig1 (unweighted-graph/undirected '((t z) (z y) (z w) (y w) (x w) (w v))))
-
 
 (define (assign-homes-exp e ls)
   (match e
