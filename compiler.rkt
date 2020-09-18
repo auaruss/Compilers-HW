@@ -7,6 +7,8 @@
 (require "interp.rkt")
 (require "utilities.rkt")
 (provide (all-defined-out))
+(require racket/dict)
+(require racket/set)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -158,60 +160,6 @@
 
 (define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 
-;;Grant's messing around with rco
-
-(define (remove-complex-opera1* p)
-    (match p
-      [(Program info e)
-       (Program info (rco-exp1 e))]))
-
-(define rco-atom1
-  (λ (e)
-    (match e
-      [(Var x) (values e '())]
-      [(Int n) (values e '())]
-      [(Let x e body)
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Let x (rco-exp1 e) (rco-exp1 body))))))]
-      [(Prim '+ (list e1 e2))
-       (define-values (x1 ls1) (rco-atom1 e1))
-       (define-values (x2 ls2) (rco-atom1 e2))
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (append (list (cons v (Prim '+ (list x1 x2)))) ls1 ls2)))]
-      [(Prim '- (list e1))
-       (define-values (x1 ls1) (rco-atom1 e1))
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (append (list (cons v (Prim '- (list x1)))) ls1)))]
-      [(Prim 'read '())
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Prim 'read '())))))]
-      )))
-
-(define rco-exp1
-  (λ (e)
-    (match e
-      [(Var x) (Var x)]
-      [(Int n) (Int n)]
-      [(Let x e body) (Let x e (rco-exp1 body))]
-      [(Prim op es)
-       (define-values (exps symbols) (map-values rco-atom1 es))
-       (foldl
-        (λ (elem acc)
-          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
-        (Prim op (reverse exps))
-        (append* symbols))])))
-
-;;(rco-exp1 (Prim '+ (list (Prim '- (list (Int 10))) (Int 4))))
-;;(remove-complex-opera1* (Program '() (Prim '+ (list (Prim '- (list (Int 10))) (Int 4)))))
-;(remove-complex-opera* (Program '() (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Int 1)))))))))
 ;; Sam
 
 ; explicate-tail : R1 -> C0Tail x [Var]
@@ -348,29 +296,42 @@
 
 ;; /Sam
 
-;; assign-homes : pseudo-x86 -> pseudo-x86
-
-(define (calc-stack-space ls)
-  (cond
-    [(null? ls) 0]
-    [else (+ 8 (calc-stack-space (cdr ls)))]
-    ))
-
-(define (find-index v ls)
-  (cond
-    ;;[(eq? v (Var-name (car ls))) 1]
-    [(eq? v (car ls)) 1]
-    [else (add1 (find-index v (cdr ls)))]
-    ))
-
-;; simplify
-;; todo: FIX PUSHQ/POPQ
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 ;; uncover-live
+
+(define (instr-arg-varset arg) (list->set '()))
+
+(define (instr-read-varset instr) (list->set '()))
+
+(define (instr-written-varset instr) (list->set '()))
+
+(define (uncover-live-helper instr-ls live-after-set)
+  (cond
+    [(null? instr-ls) (list (list->set '()))]
+    [else (let ([new-live-after-set (set-union (set-subtract live-after-set (instr-written-varset (car instr-ls))) (instr-read-varset (car instr-ls)))]) 
+	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set) (list new-live-after-set)))]
+    ))
+
+
+(define (uncover-live p)
+  (match p
+    [(Program info (CFG es)) 
+     (Program info (CFG (for/list ([ls es]) (cons (car ls) (match (cdr ls)
+							     [(Block b-info instr-ls) 
+							      (Block (uncover-live-helper (reverse instr-ls) (list->set '())) instr-ls)])))))]
+    ))
+
+;;Test from book for uncover-live
+(define 3.2example (Let 'a (Int 5) (Let 'b (Int 30) (Let 'c (Var 'a) (Let 'b (Int 10) (Let 'c (Prim '+ (list (Var 'b) (Var 'c))) (Var 'c)))))))
+(define 3.2program (Program '() 3.2example))
+;;match case used to print the block's info
+#;(match (uncover-live (select-instructions (explicate-control 3.2program)))
+       [(Program info (CFG es))
+	(match (cdr (car es)) 
+	       [(Block b-info instr-ls) b-info])])
 
 ;; build-interference
 
@@ -444,6 +405,24 @@
         (cons `(,maxsat-vert . ,col) (color-graph ig hash)))))
 
 
+;; assign-homes : pseudo-x86 -> pseudo-x86
+
+(define (calc-stack-space ls)
+  (cond
+    [(null? ls) 0]
+    [else (+ 8 (calc-stack-space (cdr ls)))]
+    ))
+
+(define (find-index v ls)
+  (cond
+    ;;[(eq? v (Var-name (car ls))) 1]
+    [(eq? v (car ls)) 1]
+    [else (add1 (find-index v (cdr ls)))]
+    ))
+
+;; simplify
+;; todo: FIX PUSHQ/POPQ
+
 (define (assign-homes-exp e ls)
   (match e
     [(Reg reg) (Reg reg)]
@@ -479,37 +458,25 @@
 
 ;; patch-instructions : psuedo-x86 -> x86
 
-;; todo: FIX PUSHQ/POPQ
+(define (patch-instructions-instr px86instr)
+  (match px86instr
+    [(Instr op (list e1 e2)) 
+     (match (list e1 e2)
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr op (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr op (list e1 e2)))]
+       )]
+    [(Instr op (list e1)) (list (Instr op (list e1)))]
+    [i (list i)]
+    ))
 
-(define (patch-instructions-exp e)
-  (match e
-    [(Instr 'addq (list e1 e2)) 
-     (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'addq (list (Reg 'rax) e2)))]
-       [(list x y) (list (Instr 'addq (list e1 e2)))]
-       )]
-    [(Instr 'subq (list e1 e2)) 
-     (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'subq (list (Reg 'rax) e2)))]
-       [(list x y) (list (Instr 'subq (list e1 e2)))]
-       )]
-    [(Instr 'movq (list e1 e2)) 
-     (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr 'movq (list (Reg 'rax) e2)))]
-       [(list x y) (list (Instr 'movq (list e1 e2)))]
-       )]
-    [(Instr 'negq (list e1)) (list (Instr 'negq (list e1)))]
-    [(Callq l) (list (Callq l))]
-    [(Retq) (list (Retq))]
-    [(Instr 'pushq e1) (list (Instr 'pushq e1))]
-    [(Instr 'popq e1) (list (Instr 'popq e1))]
-    [(Jmp e1) (list (Jmp e1))]
-    [(Block info es) (Block info (append* (for/list ([e es]) (patch-instructions-exp e))))]
+(define (patch-instructions-block px86block)
+  (match px86block
+    [(Block info es) (Block info (append* (for/list ([i es]) (patch-instructions-instr i))))]
     ))
 
 (define (patch-instructions p)
   (match p
-    [(Program info (CFG es)) (Program info (CFG (for/list ([ls es]) (cons (car ls) (patch-instructions-exp (cdr ls))))))]
+    [(Program info (CFG es)) (Program info (CFG (for/list ([ls es]) (cons (car ls) (patch-instructions-block (cdr ls))))))]
     ))
 
 ;;TEST
