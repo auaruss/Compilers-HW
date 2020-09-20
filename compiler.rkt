@@ -398,12 +398,21 @@
              [adj-verts (get-neighbors ig maxsat-vert)]
              [col (choose-least maxsat 0)])
         (for-each (λ (vert) (if (hash-has-key? hash vert)
-                                (hash-set! hash vert (cons col (hash-ref hash vert)))
+                                (hash-set! hash vert
+                                           (cons col (hash-ref hash vert)))
                                 hash))
                       adj-verts)
         (hash-remove! hash maxsat-vert)
         (cons `(,maxsat-vert . ,col) (color-graph ig hash)))))
 
+;; allocate-registers-exp : pseudo-x86 InterferenceGraph [Var] -> pseudo-x86
+;; takes in pseudo-x86 exp, intereference graph, and list of vars, returns
+;; a pseudo-x86 exp with allocated registers according to color-graph
+
+(define (allocate-registers-exp e ig vars)
+  (let* ([hash (make-hash (map (λ (var) `(,var . ())) vars))]
+         [coloring (color-graph ig hash)])
+    coloring))
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
