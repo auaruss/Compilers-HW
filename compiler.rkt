@@ -302,17 +302,34 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; uncover-live
 
-(define (instr-arg-varset arg) (list->set '()))
+(define (instr-arg-varset arg)
+  (match arg 
+	 [(Var v) (set (Var v))]
+	 [_ (list->set '())]))
 
-(define (instr-read-varset instr) (list->set '()))
+(define (instr-read-varset instr) 
+  (match instr
+	 [(Instr 'movq (list e1 e2))
+	  (instr-arg-varset e1)]
+	 [(Instr op (list e1 e2))
+	  (set-union (instr-arg-varset e1) (instr-arg-varset e2))]
+	 [(Instr 'negq (list e1))
+	  (instr-arg-varset e1)]
+	 [_ (list->set '())]))
 
-(define (instr-written-varset instr) (list->set '()))
+(define (instr-written-varset instr)
+  (match instr
+	 [(Instr op (list e1 e2))
+	  (instr-arg-varset e2)]
+	 [(Instr 'negq (list e1))
+	  (instr-arg-varset e1)]
+	 [_ (list->set '())]))
 
 (define (uncover-live-helper instr-ls live-after-set)
   (cond
     [(null? instr-ls) (list (list->set '()))]
     [else (let ([new-live-after-set (set-union (set-subtract live-after-set (instr-written-varset (car instr-ls))) (instr-read-varset (car instr-ls)))]) 
-	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set) (list new-live-after-set)))]
+	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set) (list live-after-set)))]
     ))
 
 
@@ -324,11 +341,12 @@
 							      (Block (uncover-live-helper (reverse instr-ls) (list->set '())) instr-ls)])))))]
     ))
 
-;;Test from book for uncover-live
-(define 3.2example (Let 'a (Int 5) (Let 'b (Int 30) (Let 'c (Var 'a) (Let 'b (Int 10) (Let 'c (Prim '+ (list (Var 'b) (Var 'c))) (Var 'c)))))))
-(define 3.2program (Program '() 3.2example))
+;;Test from book chapter 3
+(define ch3example (Let 'v (Int 1) (Let 'w (Int 46) (Let 'x (Prim '+ (list (Var 'v) (Int 7))) (Let 'y (Prim '+ (list (Int 4) (Var 'x))) (Let 'z (Prim '+ (list (Var 'x) (Var 'w))) (Prim  '+ (list (Var 'z) (Prim '- (list (Var 'y)))))))))))
+(define ch3program (Program '() ch3example))
 ;;match case used to print the block's info
-#;(match (uncover-live (select-instructions (explicate-control 3.2program)))
+#;(uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program)))))
+#;(match (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program)))))
        [(Program info (CFG es))
 	(match (cdr (car es)) 
 	       [(Block b-info instr-ls) b-info])])
