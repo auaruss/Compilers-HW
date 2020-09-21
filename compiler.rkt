@@ -352,6 +352,25 @@
 	       [(Block b-info instr-ls) b-info])])
 
 ;; build-interference
+(define (build-interference p)
+  (match p
+    [(Program info (CFG es))
+     (let ([l-after-k (match (cdr (car es)) 
+                        [(Block b-info instr-ls) b-info])])
+     (foldr bi-helper (undirected-graph '()) l-after-k))]))
+
+(define (bi-helper s g)
+  (let ([ls (set->list s)])
+    (cond
+      [(empty? ls) g]
+      [else
+       (for/list ([_ (cdr ls)])  (add-edge! g (car ls) _))
+       (bi-helper (cdr ls) g)
+       ])))
+        
+
+(build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))
+(get-edges (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program))))))
 
 ;; allocate-registers
 

@@ -279,7 +279,7 @@
           es))
        (let ([v (gensym 'tmp)])
          (values (Var v)
-                 (cons (cons v (Prim op exps)) (append* syms))))])))
+                 (reverse (cons (cons v (Prim op exps)) (append* syms)))))])))
 
 (: rco-exp (→ Exp Exp))
 (define rco-exp
@@ -290,7 +290,7 @@
       [(Let x e body) (Let x e (rco-exp body))]
       [(Prim op es)
        (define-values (exps symbols) (map-values rco-atom es))
-       (foldl
+       (foldr
         (λ (elem acc)
           (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
         (Prim op exps)
