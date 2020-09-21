@@ -304,7 +304,7 @@
 
 (define (instr-arg-varset arg)
   (match arg 
-	 [(Var v) (set (Var v))]
+	 [(Var v) (set v)]
 	 [_ (list->set '())]))
 
 (define (instr-read-varset instr) 
@@ -371,14 +371,14 @@
     (if (empty? ls)
         g
         (match instr
-          [(or (Instr 'addq (list s d))
-               (Instr 'subq (list s d))) 
+          [(or (Instr 'addq (list s (Var d)))
+               (Instr 'subq (list s (Var d)))) 
            (for/list ([v ls]) (if (eq? v d) 0 ; This 0 is just some dummy value so we don't do the mutation.
                                   (add-edge! g d v)))]
           [(Instr 'callq label)
            (for/list ([v ls]) (for/list ([r CALLER-SAVED-REGISTERS]) (add-edge! g r v)))]
-          [(Instr 'movq (list s d))
-           (for/list ([v ls]) (if (or (eq? v d) (eq? v s)) 0 ; This 0 is just some dummy value so we don't do the mutation.
+          [(Instr 'movq (list s (Var d)))
+           (for/list ([v ls]) (if (or (eq? v d) (and (Var? s) (eq? v (Var-name s)))) 0 ; This 0 is just some dummy value so we don't do the mutation.
                                   (add-edge! g d v)))]
           [whatever g]))
     g))
@@ -449,6 +449,11 @@
 (define h1 (make-hash '((t . ()) (z . ()) (y . ()) (w . ()) (x . ()) (v . ()))))
 (define testhash (hash 't '(a e w) 'z '() 'y '(w q f f d) 'w '() 'x '(z a) 'v '(e)))
 
+(define ch3ig
+  (match (build-interference (uncover-live (select-instructions
+                                            (explicate-control (remove-complex-opera* ch3program #;(uniquify ch3program))))))
+    [(Program info CFG) (dict-ref info 'conflicts)]))
+
 (define (color-graph ig hash)
   (if (hash-empty? hash)
       empty
@@ -468,41 +473,41 @@
 ;; takes in pseudo-x86 exp, intereference graph, and list of vars, returns
 ;; a pseudo-x86 exp with allocated registers according to color-graph
 
-(define REGCOLS '((0 . rax) (1 . rdx) (2 . rcx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
-                            (7 . r10) (8 . r11) (9 . rsp) (10 . rbp) (11 . rbx) (12 . r12)
-                            (13 . r13) (14 . r14) (15 . r15)))
+(define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
+                            (7 . r10) (8 . r11) (9 . r12) (10 . r13) (11 . r14)))
 
-(define (allocate-registers-exp e ig vars ls)
+(define (allocate-registers-exp e ig vars)
   (let* ([hash (make-hash (map (λ (var) `(,var . ())) vars))]
          [coloring (color-graph ig hash)])
     (match e
       [(Reg reg) (Reg reg)]
       [(Imm int) (Imm int)]
       [(Var v) (let ([colnum (dict-ref coloring v)])
-                 (if (<= colnum 15)
+                 (if (<= colnum 11)
                      (Reg (dict-ref REGCOLS colnum))
-                     (Deref 'rbp (* -8 (find-index v (cdr ls))))))]
-      [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 ig vars ls)
-                                                     (allocate-registers-exp e2 ig vars ls)))]
-      [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 ig vars ls)
-                                                     (allocate-registers-exp e2 ig vars ls)))]
-      [(Instr 'movq (list e1 e2)) (Instr 'movq (list (allocate-registers-exp e1 ig vars ls)
-                                                     (allocate-registers-exp e2 ig vars ls)))]
-      [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 ig vars ls)))]
+                     (Deref 'rbp (* -8 (- colnum 11)))))]
+      [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 ig vars)
+                                                     (allocate-registers-exp e2 ig vars)))]
+      [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 ig vars)
+                                                     (allocate-registers-exp e2 ig vars)))]
+      [(Instr 'movq (list e1 e2)) (Instr 'movq (list (allocate-registers-exp e1 ig vars)
+                                                     (allocate-registers-exp e2 ig vars)))]
+      [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 ig vars)))]
       [(Callq l) (Callq l)]
       [(Retq) (Retq)]
-      [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 ig vars ls)))]
-      [(Instr 'popq (list e1)) (Instr 'popq (list (allocate-registers-exp e1 ig vars ls)))]
+      [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 ig vars)))]
+      [(Instr 'popq (list e1)) (Instr 'popq (list (allocate-registers-exp e1 ig vars)))]
       [(Jmp e1) (Jmp e1)]
-      [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e ig vars ls)))])))
+      [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e ig vars)))])))
 
 (define (allocate-registers p)
   (match p
     [(Program info (CFG es))
-     (Program (list (cons 'stack-space (calc-stack-space (cdr (car info)))))
-              (CFG (for/list ([ls es]) (cons (car ls) (allocate-registers-exp (cdr ls) (dict-ref info 'conflicts)
-                                                                              (dict-ref info 'locals) (car info))))))]
-    ))
+     (Program (list (cons 'stack-space 16 #;(calc-stack-space (dict-ref info 'locals) #;(cdr (car info)))))
+              (CFG (for/list ([ls es]) (cons (car ls)
+                                             (allocate-registers-exp (cdr ls)
+                                                                     (dict-ref info 'conflicts)
+                                                                     (dict-ref info 'locals))))))]))
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
@@ -541,7 +546,8 @@
 
 (define (assign-homes p)
   (match p
-    [(Program info (CFG es)) (Program (list (cons 'stack-space (calc-stack-space (cdr (car info))))) (CFG (for/list ([ls es]) (cons (car ls) (assign-homes-exp (cdr ls) (car info))))))]
+    [(Program info (CFG es)) (Program (list (cons 'stack-space (calc-stack-space (cdr (car info)))))
+                                      (CFG (for/list ([ls es]) (cons (car ls) (assign-homes-exp (cdr ls) (car info))))))]
     ))
 
 ;; note: assign-homes passes all tests in run-tests.rkt
