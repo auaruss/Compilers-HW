@@ -362,7 +362,8 @@
                                    [(Block b-info instr-ls) (zip b-info instr-ls)])])
        (Program
         (cons (list 'conflicts
-                    (foldr (λ (pr g) (bi-helper (car pr) (cdr pr) g)) (undirected-graph '()) l-after-k-and-instrs)))
+                    (foldr (λ (pr g) (bi-helper (car pr) (cdr pr) g)) (undirected-graph '()) l-after-k-and-instrs))
+              info)
         (CFG es)))]))
 
 (define (bi-helper s instr g)
@@ -388,7 +389,10 @@
       (cons (cons (car l1) (car l2)) (zip (cdr l1) (cdr l2)))))
 
 (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))
-(get-edges (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program))))))
+(get-edges
+ (cadr
+  (assv 'conflicts
+        (Program-info (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))))))
 
 ;; allocate-registers
 
