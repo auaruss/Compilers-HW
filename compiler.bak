@@ -352,37 +352,22 @@
 	       [(Block b-info instr-ls) b-info])])
 
 ;; build-interference
-(define CALLER-SAVED-REGISTERS
-  '(rax rdx rcx rsi rdi r8 r9 r10 r11))
-
 (define (build-interference p)
   (match p
     [(Program info (CFG es))
-     (let ([l-after-k-and-instrs (match (cdr (car es)) 
-                                   [(Block b-info instr-ls) (zip b-info instr-ls)])])
-     (foldr (λ (pr g) (bi-helper (car pr) (cdr pr) g)) (undirected-graph '()) l-after-k-and-instrs))]))
+     (let ([l-after-k (match (cdr (car es)) 
+                        [(Block b-info instr-ls) b-info])])
+     (foldr bi-helper (undirected-graph '()) l-after-k))]))
 
-(define (bi-helper s instr g)
+(define (bi-helper s g)
   (let ([ls (set->list s)])
-    (if (empty? ls)
-        g
-        (match instr
-          [(or (Instr 'addq (list s d))
-               (Instr 'subq (list s d))) 
-           (for/list ([v ls]) (if (eq? v d) 0 ; This 0 is just some dummy value so we don't do the mutation.
-                                  (add-edge! g d v)))]
-          [(Instr 'callq label)
-           (for/list ([v ls]) (for/list ([r CALLER-SAVED-REGISTERS]) (add-edge! g r v)))]
-          [(Instr 'movq (list s d))
-           (for/list ([v ls]) (if (or (eq? v d) (eq? v s)) 0 ; This 0 is just some dummy value so we don't do the mutation.
-                                  (add-edge! g d v)))]
-          [whatever g]))
-    g))
-
-(define (zip l1 l2)
-  (if (or (empty? l1) (empty? l2))
-      '()
-      (cons (cons (car l1) (car l2)) (zip (cdr l1) (cdr l2)))))
+    (cond
+      [(empty? ls) g]
+      [else
+       (for/list ([_ (cdr ls)])  (add-edge! g (car ls) _))
+       (bi-helper (cdr ls) g)
+       ])))
+        
 
 (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))
 (get-edges (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program))))))
