@@ -361,7 +361,7 @@
      (let ([l-after-k-and-instrs (match (cdr (car es)) 
                                    [(Block b-info instr-ls) (zip b-info instr-ls)])])
        (Program
-        (cons (list 'conflicts
+        (cons (cons 'conflicts
                     (foldr (λ (pr g) (bi-helper (car pr) (cdr pr) g)) (undirected-graph '()) l-after-k-and-instrs))
               info)
         (CFG es)))]))
@@ -390,7 +390,7 @@
 
 (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))
 (get-edges
- (cadr
+ (cdr
   (assv 'conflicts
         (Program-info (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))))))
 
