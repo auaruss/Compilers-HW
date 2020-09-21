@@ -360,7 +360,10 @@
     [(Program info (CFG es))
      (let ([l-after-k-and-instrs (match (cdr (car es)) 
                                    [(Block b-info instr-ls) (zip b-info instr-ls)])])
-     (foldr (λ (pr g) (bi-helper (car pr) (cdr pr) g)) (undirected-graph '()) l-after-k-and-instrs))]))
+       (Program
+        (cons (list 'conflicts
+                    (foldr (λ (pr g) (bi-helper (car pr) (cdr pr) g)) (undirected-graph '()) l-after-k-and-instrs)))
+        (CFG es)))]))
 
 (define (bi-helper s instr g)
   (let ([ls (set->list s)])
