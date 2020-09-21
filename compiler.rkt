@@ -457,14 +457,45 @@
         (hash-remove! hash maxsat-vert)
         (cons `(,maxsat-vert . ,col) (color-graph ig hash)))))
 
-;; allocate-registers-exp : pseudo-x86 InterferenceGraph [Var] -> pseudo-x86
+;; allocate-registers-exp : pseudo-x86 InterferenceGraph [Var] [Var . Home] -> pseudo-x86
 ;; takes in pseudo-x86 exp, intereference graph, and list of vars, returns
 ;; a pseudo-x86 exp with allocated registers according to color-graph
 
-(define (allocate-registers-exp e ig vars)
+(define REGCOLS '((0 . rax) (1 . rdx) (2 . rcx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
+                            (7 . r10) (8 . r11) (9 . rsp) (10 . rbp) (11 . rbx) (12 . r12)
+                            (13 . r13) (14 . r14) (15 . r15)))
+
+(define (allocate-registers-exp e ig vars ls)
   (let* ([hash (make-hash (map (λ (var) `(,var . ())) vars))]
          [coloring (color-graph ig hash)])
-    coloring))
+    (match e
+      [(Reg reg) (Reg reg)]
+      [(Imm int) (Imm int)]
+      [(Var v) (let ([colnum (dict-ref coloring v)])
+                 (if (<= colnum 15)
+                     (Reg (dict-ref REGCOLS colnum))
+                     (Deref 'rbp (* -8 (find-index v (cdr ls))))))]
+      [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 ig vars ls)
+                                                     (allocate-registers-exp e2 ig vars ls)))]
+      [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 ig vars ls)
+                                                     (allocate-registers-exp e2 ig vars ls)))]
+      [(Instr 'movq (list e1 e2)) (Instr 'movq (list (allocate-registers-exp e1 ig vars ls)
+                                                     (allocate-registers-exp e2 ig vars ls)))]
+      [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 ig vars ls)))]
+      [(Callq l) (Callq l)]
+      [(Retq) (Retq)]
+      [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 ig vars ls)))]
+      [(Instr 'popq (list e1)) (Instr 'popq (list (allocate-registers-exp e1 ig vars ls)))]
+      [(Jmp e1) (Jmp e1)]
+      [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e ig vars ls)))])))
+
+(define (allocate-registers p)
+  (match p
+    [(Program info (CFG es))
+     (Program (list (cons 'stack-space (calc-stack-space (cdr (car info)))))
+              (CFG (for/list ([ls es]) (cons (car ls) (allocate-registers-exp (cdr ls) (dict-ref info 'conflicts)
+                                                                              (dict-ref info 'locals) (car info))))))]
+    ))
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
