@@ -344,6 +344,15 @@
 ;;Test from book chapter 3
 (define ch3example (Let 'v (Int 1) (Let 'w (Int 46) (Let 'x (Prim '+ (list (Var 'v) (Int 7))) (Let 'y (Prim '+ (list (Int 4) (Var 'x))) (Let 'z (Prim '+ (list (Var 'x) (Var 'w))) (Prim  '+ (list (Var 'z) (Prim '- (list (Var 'y)))))))))))
 (define ch3program (Program '() ch3example))
+(define r1-11 (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Int 1))))))))
+(define r1-11prog (Program '() r1-11))
+
+(define r1-12 (Prim '+ (list (Let 'x (Int 1) (Var 'x)) (Let 'x (Int 1) (Var 'x)))))
+(define r1-12prog (Program '() r1-12))
+
+(define asd (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Int 1))))))
+(define asdp (Program '() asd))
+
 ;;match case used to print the block's info
 #;(uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program)))))
 #;(match (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program)))))
@@ -373,12 +382,12 @@
         (match instr
           [(or (Instr 'addq (list s (Var d)))
                (Instr 'subq (list s (Var d)))) 
-           (for/list ([v ls]) (if (eq? v d) 0 ; This 0 is just some dummy value so we don't do the mutation.
+           (for/list ([v ls]) (if (eq? v d) (add-vertex! g d) 
                                   (add-edge! g d v)))]
           [(Instr 'callq label)
            (for/list ([v ls]) (for/list ([r CALLER-SAVED-REGISTERS]) (add-edge! g r v)))]
           [(Instr 'movq (list s (Var d)))
-           (for/list ([v ls]) (if (or (eq? v d) (and (Var? s) (eq? v (Var-name s)))) 0 ; This 0 is just some dummy value so we don't do the mutation.
+           (for/list ([v ls]) (if (or (eq? v d) (and (Var? s) (eq? v (Var-name s)))) (add-vertex! g d) 
                                   (add-edge! g d v)))]
           [whatever g]))
     g))
@@ -388,8 +397,8 @@
       '()
       (cons (cons (car l1) (car l2)) (zip (cdr l1) (cdr l2)))))
 
-(build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))
-(get-edges
+#;(build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))
+#;(get-edges
  (cdr
   (assv 'conflicts
         (Program-info (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))))))
@@ -400,7 +409,8 @@
 ;; gets longest list in list of lists
 
 (define (get-longest ls)
-  (if (empty? ls)
+  (map length ls)
+  #;(if (empty? ls)
       '()
       (if (>= (length (first ls))
               (length (get-longest (rest ls))))
@@ -451,17 +461,39 @@
 
 (define ch3ig
   (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* ch3program #;(uniquify ch3program))))))
+                                            (explicate-control (remove-complex-opera* (uniquify ch3program))))))
     [(Program info CFG) (dict-ref info 'conflicts)]))
+
+(define r1-11ig
+  (match (build-interference (uncover-live (select-instructions
+                                            (explicate-control (remove-complex-opera* (uniquify r1-11prog))))))
+    [(Program info CFG) (dict-ref info 'conflicts)]))
+
+(define r1-12ig
+  (match (build-interference (uncover-live (select-instructions
+                                            (explicate-control (remove-complex-opera* (uniquify r1-12prog))))))
+    [(Program info CFG) (dict-ref info 'conflicts)]))
+
+(define asdig
+  (match (build-interference (uncover-live (select-instructions
+                                            (explicate-control (remove-complex-opera* (uniquify asdp))))))
+    [(Program info CFG) (dict-ref info 'conflicts)]))
+
+
+
+
 
 (define (color-graph ig hash)
   (if (hash-empty? hash)
       empty
       (let* ([maxsat (get-longest-val hash)]
              [maxsat-vert (hash-key hash maxsat)]
-             [adj-verts (get-neighbors ig maxsat-vert)]
+             [adj-verts (if (has-vertex? ig maxsat-vert)
+                            (get-neighbors ig maxsat-vert)
+                            '())]
              [col (choose-least maxsat 0)])
-        (for-each (λ (vert) (if (hash-has-key? hash vert)
+        (for-each (λ (vert) (if (and (hash-has-key? hash vert)
+                                     (not (member col (hash-ref hash vert))))
                                 (hash-set! hash vert
                                            (cons col (hash-ref hash vert)))
                                 hash))
@@ -476,7 +508,32 @@
 (define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
                             (7 . r10) (8 . r11) (9 . r12) (10 . r13) (11 . r14)))
 
-(define (allocate-registers-exp e ig vars)
+;; change sig to
+;; allocate-registers-exp : pseudo-x86 [Var . Nat] -> pseudo-x86
+
+(define (allocate-registers-exp e coloring)
+    (match e
+      [(Reg reg) (Reg reg)]
+      [(Imm int) (Imm int)]
+      [(Var v) (let ([colnum (dict-ref coloring v)])
+                 (if (<= colnum 11)
+                     (Reg (dict-ref REGCOLS colnum))
+                     (Deref 'rbp (* -8 (- colnum 11)))))]
+      [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring)
+                                                     (allocate-registers-exp e2 coloring)))]
+      [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring)
+                                                     (allocate-registers-exp e2 coloring)))]
+      [(Instr 'movq (list e1 e2)) (Instr 'movq (list (allocate-registers-exp e1 coloring)
+                                                     (allocate-registers-exp e2 coloring)))]
+      [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 coloring)))]
+      [(Callq l) (Callq l)]
+      [(Retq) (Retq)]
+      [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 coloring)))]
+      [(Instr 'popq (list e1)) (Instr 'popq (list (allocate-registers-exp e1 coloring)))]
+      [(Jmp e1) (Jmp e1)]
+      [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e coloring)))]))
+
+#;(define (allocate-registers-exp e ig vars)
   (let* ([hash (make-hash (map (λ (var) `(,var . ())) vars))]
          [coloring (color-graph ig hash)])
     (match e
@@ -505,7 +562,11 @@
     [(Program info (CFG es))
      (Program (list (cons 'stack-space 16 #;(calc-stack-space (dict-ref info 'locals) #;(cdr (car info)))))
               (CFG (for/list ([ls es]) (cons (car ls)
-                                             (allocate-registers-exp (cdr ls)
+                                             (allocate-registers-exp
+                                              (cdr ls)
+                                              (color-graph (dict-ref info 'conflicts)
+                                                           (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals)))))
+                                             #;(allocate-registers-exp (cdr ls)
                                                                      (dict-ref info 'conflicts)
                                                                      (dict-ref info 'locals))))))]))
 
