@@ -409,7 +409,8 @@
 ;; gets longest list in list of lists
 
 (define (get-longest ls)
-  (if (empty? ls)
+  (foldr (λ (e acc) (if (> (length e) (length acc)) e acc)) (car ls) (cdr ls))
+  #;(if (empty? ls)
       '()
       (if (>= (length (first ls))
               (length (get-longest (rest ls))))
@@ -572,16 +573,22 @@
 (define (allocate-registers p)
   (match p
     [(Program info (CFG es))
-     (Program (list (cons 'stack-space 128 #;(calc-stack-space (dict-ref info 'locals) #;(cdr (car info)))))
-              (CFG (let ([coloring (color-graph (dict-ref info 'conflicts)
-                                                           (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals))))])
-                     (for/list ([ls es]) (cons (car ls)
-                                               (allocate-registers-exp
-                                                (cdr ls)
-                                                coloring)
-                                               #;(allocate-registers-exp (cdr ls)
-                                                                         (dict-ref info 'conflicts)
-                                                                         (dict-ref info 'locals)))))))]))
+     (let ([coloring (color-graph (dict-ref info 'conflicts)
+                                  (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals))))])
+       (Program (list (cons 'stack-space (let ([f (* 8 (- (if (> (length coloring) 0)
+                                                              (apply max (map (λ (assoc) (cdr assoc)) coloring))
+                                                              0) 12))])
+                                           (if (negative? f)
+                                               0
+                                               (+ f (modulo f 16))))))
+                (CFG 
+                 (for/list ([ls es]) (cons (car ls)
+                                           (allocate-registers-exp
+                                            (cdr ls)
+                                            coloring)
+                                           #;(allocate-registers-exp (cdr ls)
+                                                                     (dict-ref info 'conflicts)
+                                                                     (dict-ref info 'locals)))))))]))
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
@@ -665,16 +672,27 @@
 
 ;; Grant/Sam
 
+(define r1-10 (Let 'x (Prim 'read '()) (Let 'y (Prim 'read '()) (Prim '+ (list (Var 'x) (Prim '- (list (Var 'y))))))))
+(define r1-10prog (Program '() r1-10))
+
 (define x86prog (patch-instructions (assign-homes (select-instructions (explicate-control r1program-let)))))
 ;x86prog
 
+;rsp  rbx r12 r13 r14 r15
+;
+(define callee-reg-str-push
+  "pushq\t%rsp\n\tpushq\t%rbx\n\tpushq\t%r12\n\tpushq\t%r13\n\tpushq\t%r14\n\tpushq\t%r15")
+;
+(define callee-reg-str-pop
+  "popq\t%r15\n\tpopq\t%r14\n\tpopq\t%r13\n\tpopq\t%r12\n\tpopq\t%rbx\n\tpopq\t%rsp")
+
 (define (main-str stacksize)
-  (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp ~a\n"
-          (label-name "main") (label-name "main") (align stacksize 16) (label-name "start"))) ;; 16 is stack-space
+  (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\t~a\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp ~a\n"
+           (label-name "main") (label-name "main") callee-reg-str-push (align stacksize 16) (label-name "start"))) ;; 16 is stack-space
 
 (define (concl-str stacksize)
-  (format "~a:\n\taddq\t$~a, %rsp\n\tpopq\t%rbp\n\tretq"
-          (label-name "conclusion") (align stacksize 16))) ;; stack-space
+  (format "~a:\n\taddq\t$~a, %rsp\n\t~a\n\tpopq\t%rbp\n\tretq"
+          (label-name "conclusion") (align stacksize 16) callee-reg-str-pop)) ;; stack-space
 
 (define (stringify-arg arg)
   (match arg
