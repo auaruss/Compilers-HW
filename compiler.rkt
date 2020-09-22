@@ -577,10 +577,10 @@
                                   (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals))))])
        (Program (list (cons 'stack-space (let ([f (* 8 (- (if (> (length coloring) 0)
                                                               (apply max (map (λ (assoc) (cdr assoc)) coloring))
-                                                              0) 12))])
+                                                              0) 11))])
                                            (if (negative? f)
                                                0
-                                               (+ f (modulo f 16))))))
+                                               f #;(+ f (modulo f 16))))))
                 (CFG 
                  (for/list ([ls es]) (cons (car ls)
                                            (allocate-registers-exp
