@@ -409,8 +409,7 @@
 ;; gets longest list in list of lists
 
 (define (get-longest ls)
-  (map length ls)
-  #;(if (empty? ls)
+  (if (empty? ls)
       '()
       (if (>= (length (first ls))
               (length (get-longest (rest ls))))
@@ -557,7 +556,7 @@
       [(Jmp e1) (Jmp e1)]
       [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e ig vars)))])))
 
-(define (allocate-registers p)
+#;(define (allocate-registers p)
   (match p
     [(Program info (CFG es))
      (Program (list (cons 'stack-space 16 #;(calc-stack-space (dict-ref info 'locals) #;(cdr (car info)))))
@@ -569,6 +568,20 @@
                                              #;(allocate-registers-exp (cdr ls)
                                                                      (dict-ref info 'conflicts)
                                                                      (dict-ref info 'locals))))))]))
+
+(define (allocate-registers p)
+  (match p
+    [(Program info (CFG es))
+     (Program (list (cons 'stack-space 128 #;(calc-stack-space (dict-ref info 'locals) #;(cdr (car info)))))
+              (CFG (let ([coloring (color-graph (dict-ref info 'conflicts)
+                                                           (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals))))])
+                     (for/list ([ls es]) (cons (car ls)
+                                               (allocate-registers-exp
+                                                (cdr ls)
+                                                coloring)
+                                               #;(allocate-registers-exp (cdr ls)
+                                                                         (dict-ref info 'conflicts)
+                                                                         (dict-ref info 'locals)))))))]))
 
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
