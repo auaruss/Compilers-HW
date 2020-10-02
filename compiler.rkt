@@ -518,7 +518,7 @@
       [(Var v) (let ([colnum (dict-ref coloring v)])
                  (if (<= colnum 11)
                      (Reg (dict-ref REGCOLS colnum))
-                     (Deref 'rbp (* -8 (- colnum 11)))))]
+                     (Deref 'rbp (+ 48 (* -8 (- colnum 11))))))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring)
                                                      (allocate-registers-exp e2 coloring)))]
       [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring)
@@ -681,18 +681,18 @@
 ;rsp  rbx r12 r13 r14 r15
 ;
 (define callee-reg-str-push
-  "pushq\t%rsp\n\tpushq\t%rbx\n\tpushq\t%r12\n\tpushq\t%r13\n\tpushq\t%r14\n\tpushq\t%r15")
+  "\tpushq\t%rbx\n\tpushq\t%r12\n\tpushq\t%r13\n\tpushq\t%r14\n\tpushq\t%r15")
 ;
 (define callee-reg-str-pop
-  "popq\t%r15\n\tpopq\t%r14\n\tpopq\t%r13\n\tpopq\t%r12\n\tpopq\t%rbx\n\tpopq\t%rsp")
+  "popq\t%r15\n\tpopq\t%r14\n\tpopq\t%r13\n\tpopq\t%r12\n\tpopq\t%rbx")
 
 (define (main-str stacksize)
-  (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\t~a\n\tmovq\t%rsp, %rbp\n\tsubq\t$~a, %rsp\n\tjmp ~a\n"
-           (label-name "main") (label-name "main") callee-reg-str-push (align stacksize 16) (label-name "start"))) ;; 16 is stack-space
+  (format "\t.globl ~a\n~a:\n\tpushq\t%rbp\n\tmovq\t%rsp, %rbp\n~a\n\tsubq\t$~a, %rsp\n\tjmp ~a\n"
+           (label-name "main") (label-name "main") callee-reg-str-push (+ 8 (align stacksize 16)) (label-name "start"))) ;; 16 is stack-space
 
 (define (concl-str stacksize)
   (format "~a:\n\taddq\t$~a, %rsp\n\t~a\n\tpopq\t%rbp\n\tretq"
-          (label-name "conclusion") (align stacksize 16) callee-reg-str-pop)) ;; stack-space
+          (label-name "conclusion") (+ 8 (align stacksize 16)) callee-reg-str-pop)) ;; stack-space
 
 (define (stringify-arg arg)
   (match arg
@@ -744,4 +744,6 @@
                                      (main-str (cdr (car info)))
                                      (concl-str (cdr (car info))))]))
 
+(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (Program '() (Prim 'read (list)))))))))))))
+;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program))))))))))
 ;;Grant/Sam
