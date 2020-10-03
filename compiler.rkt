@@ -4,6 +4,7 @@
 (require racket/fixnum)
 (require "interp-R0.rkt")
 (require "interp-R1.rkt")
+(require "interp-R2.rkt")
 (require "interp.rkt")
 (require "utilities.rkt")
 (provide (all-defined-out))
@@ -67,14 +68,22 @@
 ;; HW3 Passes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (comparator? op)
+;;Type-Check Pass: R2 -> R2
+
+(define (boolean-operator? op)
+  (match op
+    ['and #t]
+    ['or #t]
+    ['not #t]
+    [else #f]))
+
+(define (comparison-operator? op)
   (match op
     ['eq? #t]
     ['< #t]
     ['<= #t]
     ['> #t]
     ['>= #t]
-    ['not #t]
     [else #f]))
 
 (define (type-check-exp env)
@@ -88,36 +97,44 @@
         (define Tb ((type-check-exp (dict-set env x Te)) body))
         Tb]
       [(Prim op (list)) 'Integer]
-      [(Prim op (list arg1)) 
+      [(Prim op (list e1)) 
        (match op
 	 ['-   
-          (define Ta ((type-check-exp env) arg1))
-          (unless (equal? Ta 'Integer)
-            (error "argument to an arithmetic operator must be an integer, not" Ta))
+          (define Te ((type-check-exp env) e1))
+          (unless (equal? Te 'Integer)
+            (error "argument to an arithmetic operator must be an integer, not" Te))
 	  'Integer]
 	 ['not 
-          (define Ta ((type-check-exp env) arg1))
-          (unless (equal? Ta 'Boolean)
-            (error "argument to a comparison operator must be a boolean, not" Ta))
+          (define Te ((type-check-exp env) e1))
+          (unless (equal? Te 'Boolean)
+            (error "argument to a boolean operator must be a boolean, not" Te))
 	  'Boolean])]
-      [(Prim op (list arg1 arg2))
+      [(Prim op (list e1 e2))
        (match op
-	 [`,y #:when (comparator? op)
-          (define Ta1 ((type-check-exp env) arg1))
-          (define Ta2 ((type-check-exp env) arg2))
-          (unless (equal? Ta1 'Boolean)
-            (error "argument to a comparison operator must be a boolean, not" Ta1))
-          (unless (equal? Ta2 'Boolean)
-            (error "argument to a comparison operator must be a boolean, not" Ta2))
+         [`,y #:when (boolean-operator? op)
+          (define Te1 ((type-check-exp env) e1))
+          (define Te2 ((type-check-exp env) e2))
+          (unless (equal? Te1 'Boolean)
+            (error "argument to a boolean operator must be a boolean, not" Te1))
+          (unless (equal? Te2 'Boolean)
+            (error "argument to a boolean operator must be a boolean, not" Te2))
+	  'Boolean]
+         [`,y #:when (comparison-operator? op)
+          (define Te1 ((type-check-exp env) e1))
+          (define Te2 ((type-check-exp env) e2))
+          (unless (equal? Te1 'Integer)
+            (error "argument to a comparison operator must be a integer, not" Te1))
+          (unless (equal? Te2 'Integer)
+            (error "argument to a copmarison operator must be an integer, not" Te2))
 	  'Boolean]
 	 [else
-          (define Ta1 ((type-check-exp env) arg1))
-          (define Ta2 ((type-check-exp env) arg2))
-          (unless (equal? Ta1 'Integer)
-            (error "argument to an arithmetic operator must be an integer, not" Ta1))
-          (unless (equal? Ta2 'Integer)
-            (error "argument to an arithmetic operator must be an integer, not" Ta2))
-	   'Integer])] 
+          (define Te1 ((type-check-exp env) e1))
+          (define Te2 ((type-check-exp env) e2))
+          (unless (equal? Te1 'Integer)
+            (error "argument to an arithmetic operator must be an integer, not" Te1))
+          (unless (equal? Te2 'Integer)
+            (error "argument to an arithmetic operator must be an integer, not" Te2))
+         'Integer])] 
       [(If e1 e2 e3)
           (define Te1 ((type-check-exp env) e1))
           (define Te2 ((type-check-exp env) e2))
@@ -146,6 +163,34 @@
 (define r2p4 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Bool #f) (Bool #t)) (Prim 'read '())))))
 
 ;;((type-check-R2 '()) r2p4)
+
+;;Shrink Pass: R2 -> R2
+(define (shrink-exp e)
+  (match e
+    [(Prim '- (list e1 e2)) (Prim '+ (list (shrink-exp e1) (Prim '- (list (shrink-exp e2)))))]
+    [(Prim 'and (list e1 e2)) (If (shrink-exp e1) (If (shrink-exp e2) (Bool #t) (Bool #f)) (Bool #f))]
+    [(Prim 'or (list e1 e2)) (If (shrink-exp e1) (Bool #t) (If (shrink-exp e2) (Bool #t) (Bool #f)))]
+    [(Prim '<= (list e1 e2)) (Prim 'not (list (shrink-exp (Prim '> (list e1 e2)))))]
+    [(Prim '> (list e1 e2)) (let ([new-tmp (gensym 'tmp)]) (Let new-tmp (shrink-exp e1) (Prim '< (list (shrink-exp e2) (Var new-tmp)))))]
+    [(Prim '>= (list e1 e2)) (Prim 'not (list (shrink-exp (Prim '< (list e1 e2)))))]
+    [(Prim op (list e1)) (Prim op (list (shrink-exp e1)))]
+    [(Prim op (list e1 e2)) (Prim op (list (shrink-exp e1) (shrink-exp e2)))]
+    [(If e1 e2 e3) (If (shrink-exp e1) (shrink-exp e2) (shrink-exp e3))]
+    [else e]
+    ))
+
+(define (shrink p)
+  (match p
+    [(Program info e)
+     (Program info (shrink-exp e))]
+    ))
+
+(define r2p5 (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()) (Int 7))) (Prim 'read '())))))
+(define r2p6 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '<= (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
+(define r2p7 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '> (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
+(define r2p8 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '<= (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
+
+;;(interp-R2 (shrink ((type-check-R2 '()) r2p8)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HW1 Passes
