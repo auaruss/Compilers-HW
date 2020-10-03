@@ -64,6 +64,90 @@
 (test-pe (parse-program `(program () (- (+ 3 (- 5))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; HW3 Passes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (comparator? op)
+  (match op
+    ['eq? #t]
+    ['< #t]
+    ['<= #t]
+    ['> #t]
+    ['>= #t]
+    ['not #t]
+    [else #f]))
+
+(define (type-check-exp env)
+  (lambda (e)
+    (match e
+      [(Var x) (dict-ref env x)]
+      [(Int n) 'Integer]
+      [(Bool b) 'Boolean]
+      [(Let x e body)
+        (define Te ((type-check-exp env) e))
+        (define Tb ((type-check-exp (dict-set env x Te)) body))
+        Tb]
+      [(Prim op (list)) 'Integer]
+      [(Prim op (list arg1)) 
+       (match op
+	 ['-   
+          (define Ta ((type-check-exp env) arg1))
+          (unless (equal? Ta 'Integer)
+            (error "argument to an arithmetic operator must be an integer, not" Ta))
+	  'Integer]
+	 ['not 
+          (define Ta ((type-check-exp env) arg1))
+          (unless (equal? Ta 'Boolean)
+            (error "argument to a comparison operator must be a boolean, not" Ta))
+	  'Boolean])]
+      [(Prim op (list arg1 arg2))
+       (match op
+	 [`,y #:when (comparator? op)
+          (define Ta1 ((type-check-exp env) arg1))
+          (define Ta2 ((type-check-exp env) arg2))
+          (unless (equal? Ta1 'Boolean)
+            (error "argument to a comparison operator must be a boolean, not" Ta1))
+          (unless (equal? Ta2 'Boolean)
+            (error "argument to a comparison operator must be a boolean, not" Ta2))
+	  'Boolean]
+	 [else
+          (define Ta1 ((type-check-exp env) arg1))
+          (define Ta2 ((type-check-exp env) arg2))
+          (unless (equal? Ta1 'Integer)
+            (error "argument to an arithmetic operator must be an integer, not" Ta1))
+          (unless (equal? Ta2 'Integer)
+            (error "argument to an arithmetic operator must be an integer, not" Ta2))
+	   'Integer])] 
+      [(If e1 e2 e3)
+          (define Te1 ((type-check-exp env) e1))
+          (define Te2 ((type-check-exp env) e2))
+          (define Te3 ((type-check-exp env) e3))
+          (unless (equal? Te1 'Boolean)
+            (error "If condition must be a boolean, not" Te1))
+          (unless (equal? Te2 Te3)
+            (error "branches of an if statement must be the same type, not" Te2 'and Te3))
+	  Te2]
+      [else
+        (error "type-check-exp couldn't match" e)])))
+
+(define (type-check-R2 env)
+  (lambda (e)
+    (match e
+      [(Program info body)
+        (define Tb ((type-check-exp '()) body))
+        (unless (equal? Tb 'Integer)
+          (error "result of the program must be an integer, not" Tb))
+        (Program info body)]
+)))
+
+(define r2p1 (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
+(define r2p2 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Int 6)) (Prim 'read '())))))
+(define r2p3 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Bool #t)) (Prim 'read '())))))
+(define r2p4 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Bool #f) (Bool #t)) (Prim 'read '())))))
+
+;;((type-check-R2 '()) r2p4)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HW1 Passes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
