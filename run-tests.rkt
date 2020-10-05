@@ -3,12 +3,11 @@
 
 (require "utilities.rkt")
 (require "interp-R1.rkt")
-(require "interp-R2.rkt")
+(require "interp-C0.rkt")
 (require "interp.rkt")
 (require "compiler.rkt")
 ;; (debug-level 1)
-(AST-output-syntax 'abstract-syntax)
-;x86prog
+;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
 ;; Note that your compiler file (or whatever file provides your passes)
