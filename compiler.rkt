@@ -572,16 +572,16 @@
                   [v_ (sel-ins-atm v)])
               (list
                (Instr 'cmpq (list atm2_ atm1_))
-               (Instr 'setq (list 'e '%al))
-               (Instr 'movzbq (list '%a1 v_))))]
+               (Instr 'set (list 'e (Reg 'al)))
+               (Instr 'movzbq (list (Reg 'al) v_))))]
            [(Prim '< (list atm1 atm2))
            (let ([atm1_ (sel-ins-atm atm1)]
                   [atm2_ (sel-ins-atm atm2)]
                   [v_ (sel-ins-atm v)])
               (list
                (Instr 'cmpq (list atm2_ atm1_))
-               (Instr 'setq (list 'l '%al))
-               (Instr 'movzbq (list '%a1 v_))))]))]))
+               (Instr 'set (list 'l (Reg 'al)))
+               (Instr 'movzbq (list (Reg 'al) v_))))]))]))
 
 ; sel-ins-tail : C1tail -> pseudo-x86
 ; takes in a c1 tail and converts it ot pseudo-x86
