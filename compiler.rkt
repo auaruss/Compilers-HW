@@ -557,20 +557,26 @@
                               (Instr 'addq (list x86atm2 v)))])]
            [(Prim 'not (list atm))
             (if (eqv? v atm)
-                (list (Instr 'xorq (list 1 v)))
+                (list (Instr 'xorq (list (Imm 1) v)))
                 (list (let ([atm_ (sel-ins-atm atm)])
                         (Instr 'movq (list atm_ v)))
-                      (Instr 'xorq (list 1 v))))]
+                      (Instr 'xorq (list (Imm 1) v))))]
            [(Prim 'eq? (list atm1 atm2))
             (let ([atm1_ (sel-ins-atm atm1)]
                   [atm2_ (sel-ins-atm atm2)]
                   [v_ (sel-ins-atm v)])
               (list
                (Instr 'cmpq (list atm2_ atm1_))
-               (Instr 'setq (list '%al))
+               (Instr 'setq (list 'e '%al))
                (Instr 'movzbq (list '%a1 v_))))]
            [(Prim '< (list atm1 atm2))
-            ]))]))
+           (let ([atm1_ (sel-ins-atm atm1)]
+                  [atm2_ (sel-ins-atm atm2)]
+                  [v_ (sel-ins-atm v)])
+              (list
+               (Instr 'cmpq (list atm2_ atm1_))
+               (Instr 'setq (list 'l '%al))
+               (Instr 'movzbq (list '%a1 v_))))]))]))
 
 ; sel-ins-tail : C1tail -> pseudo-x86
 ; takes in a c1 tail and converts it ot pseudo-x86
@@ -586,15 +592,20 @@
      (append x86stmt x86tail)]
     [(Goto label)
      (list (Jmp label)) ]
-    [(IfStmt ('eq? arg1 arg2) (Goto label1) (Goto label2))
+    [(IfStmt (list 'eq? arg1 arg2) (Goto label1) (Goto label2))
      (let ([arg1_ (sel-ins-atm arg1)]
            [arg2_ (sel-ins-atm arg2)])
        (list
         (Instr 'cmpq (list arg2_ arg1_))
-        (Instr 'je l1)
-        (Jmp l2)))]
-    [(IfStmt ('< arg1 arg2) (Goto label1) (Goto label2))
-     ...]))
+        (JmpIf 'e label1)
+        (Jmp label2)))]
+    [(IfStmt (list '< arg1 arg2) (Goto label1) (Goto label2))
+     (let ([arg1_ (sel-ins-atm arg1)]
+           [arg2_ (sel-ins-atm arg2)])
+       (list
+        (Instr 'cmpq (list arg2_ arg1_))
+        (JmpIf 'l label1)
+        (Jmp label2)))]))
 
 ;; select-instructions : C0 -> pseudo-x86
 (define (select-instructions p)
