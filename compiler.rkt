@@ -664,6 +664,9 @@
         )]
     ))
 
+;; turn association list of blocks in CFG into graph
+;; then reverse topo sort said graph, uncover-live that sorted list
+
 (define (instr-arg-varset arg)
   (match arg 
 	 [(Var v) (set v)]
@@ -732,6 +735,10 @@
 	       [(Block b-info instr-ls) b-info])])
 
 ;; build-interference
+
+;; movzbq is similar to movq
+;; consider register al the same as rax
+
 (define CALLER-SAVED-REGISTERS
   '(rax rdx rcx rsi rdi r8 r9 r10 r11))
 
@@ -1014,6 +1021,9 @@
 ;; Grant
 
 ;; patch-instructions : psuedo-x86 -> x86
+
+;; fix cmpq with second arg as immediate
+;; fix movzbq target arg must be register (move stack var into reg for it)
 
 (define (patch-instructions-instr px86instr)
   (match px86instr
