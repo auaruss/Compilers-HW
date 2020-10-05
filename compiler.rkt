@@ -4,7 +4,6 @@
 (require racket/fixnum)
 (require "interp-R0.rkt")
 (require "interp-R1.rkt")
-(require "interp-R2.rkt")
 (require "interp.rkt")
 (require "utilities.rkt")
 (provide (all-defined-out))

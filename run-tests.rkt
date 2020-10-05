@@ -2,17 +2,20 @@
 #lang racket
 
 (require "utilities.rkt")
-(require "interp-R1.rkt")
-(require "interp-C0.rkt")
+#;(require "interp-R1.rkt")
+(require "interp-R2.rkt")
+#;(require "interp-C0.rkt")
+(require "interp-C1.rkt")
 (require "interp.rkt")
 (require "compiler.rkt")
+(AST-output-syntax 'abstract-syntax)
 ;; (debug-level 1)
 ;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
 ;; Note that your compiler file (or whatever file provides your passes)
 ;; should be named "compiler.rkt"
-(define r1-passes
+#;(define r1-passes
   `( ("uniquify" ,uniquify ,interp-R1)
      ("remove complex opera*" ,remove-complex-opera* ,interp-R1)
      ("explicate control" ,explicate-control ,interp-C0)
