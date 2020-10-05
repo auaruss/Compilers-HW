@@ -1,14 +1,14 @@
 #lang racket
 (require racket/fixnum)
 (require "utilities.rkt")
-(provide interp-R2 interp-C1)
+(provide interp-R2 interp-exp)
 
 ;; Note to maintainers of this code:
 ;;   A copy of this interpreter is in the book and should be
 ;;   kept in sync with this code.
 
 (define primitives (set '+ '-  'read
-                        'eq? '< '<= '> '>= 'not))
+                        'eq? '< '<= '> '>= 'not 'or))
 
 (define (interp-op op)
   (match op
@@ -16,6 +16,9 @@
     ['- fx-]
     ['read read-fixnum]
     ['not (lambda (v) (match v [#t #f] [#f #t]))]
+    ['or (lambda (v1 v2)
+           (cond [(and (boolean? v1) (boolean? v2))
+                  (or v1 v2)]))]
     ['eq? (lambda (v1 v2)
 	    (cond [(or (and (fixnum? v1) (fixnum? v2))
 		       (and (boolean? v1) (boolean? v2))
@@ -66,39 +69,4 @@
   (match p
     [(Program info e)
      ((interp-exp '()) e)]
-    ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (interp-C1-stmt env)
-  (lambda (s)
-    (match s
-      [(Assign (Var x) e)
-       (cons (cons x ((interp-exp env) e)) env)]
-      [else
-       (error "interp-C1-stmt unmatched" s)]
-      )))
-
-(define (interp-C1-tail env CFG)
-  (lambda (t)
-    (match t
-      [(Return e)
-       ((interp-exp env) e)]
-      [(Goto l)
-       ((interp-C1-tail env CFG) (dict-ref CFG l))]
-      [(IfStmt (Prim op arg*) (Goto thn-label) (Goto els-label))
-       (if ((interp-exp env) (Prim op arg*))
-           ((interp-C1-tail env CFG) (dict-ref CFG thn-label))
-           ((interp-C1-tail env CFG) (dict-ref CFG els-label)))]
-      [(Seq s t2)
-       (define new-env ((interp-C1-stmt env) s))
-       ((interp-C1-tail new-env CFG) t2)]
-      [else
-       (error "interp-C1-tail unmatched" t)]
-      )))
-  
-(define (interp-C1 p)
-  (match p
-    [(Program info (CFG G))
-     ((interp-C1-tail '() G) (dict-ref G 'start))]
     ))
