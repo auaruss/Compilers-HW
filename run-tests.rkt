@@ -31,7 +31,7 @@
      ("shrink" ,shrink ,interp-R2)
      ("uniquify" ,uniquify ,interp-R2)
      ("remove complex opera*" ,remove-complex-opera* ,interp-R2)
-     #;("explicate control" ,explicate-control ,interp-C0)
+     ("explicate control" ,explicate-control ,interp-C1)
      #;("instruction selection" ,select-instructions ,R1-interp-x86)
      #;("uncover live" ,uncover-live ,R1-interp-x86)
      #;("build interference" ,build-interference ,R1-interp-x86)

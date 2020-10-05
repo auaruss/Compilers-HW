@@ -11,6 +11,8 @@
 (require racket/dict)
 (require racket/set)
 
+(define globalCFG (directed-graph '()))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -391,22 +393,31 @@
 
 ; explicate-tail : R1 -> C0Tail x [Var]
 ; takes in R1 expression and produces C0 Tail and list of let-bound variables
-(define (explicate-tail r1exp)
-  (match r1exp
+(define (explicate-tail r2exp)
+  (match r2exp
     [(Int n)
      (values (Return (Int n)) '())]
+    [(Bool b)
+     (values (Return (Bool b)) '())]
     [(Prim 'read '())
      (values (Return (Prim 'read '())) '())]
-    [(Prim '- (list e))
-     (values (Return (Prim '- (list e))) '())]
-    [(Prim '+ (list e1 e2))
-     (values (Return (Prim '+ (list e1 e2))) '())] 
+    [(Prim op (list e))
+     (values (Return (Prim op (list e))) '())]
+    [(Prim op (list e1 e2))
+     (values (Return (Prim op (list e1 e2))) '())] 
     [(Var x)
      (values (Return (Var x)) '())]
     [(Let x e body) 
-     (define-values (c0tail let-binds) (explicate-tail body))
-     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail)) ;; why var here
-     (values c0tail^ (cons x (append let-binds let-binds^)))]))
+     (define-values (c1tail let-binds) (explicate-tail body))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail)) ;; why var here
+     (values c1tail^ (cons x (append let-binds let-binds^)))]
+    [(If e1 e2 e3)
+     (define-values (c1tail-then let-binds-then) (explicate-tail e2))
+     (define-values (c1tail-else let-binds-else) (explicate-tail e3))  
+     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
+     (values c1tail-new (append let-binds-then let-binds-else let-binds-new))
+     ]
+    ))
 
 
 ; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
@@ -415,31 +426,80 @@
 
 ;; simplify
 
-(define (explicate-assign r1exp v c)
-  (match r1exp
+(define (explicate-assign r2exp v c)
+  (match r2exp
     [(Int n)
      (values (Seq (Assign v (Int n)) c) '())]
+    [(Bool b)
+     (values (Seq (Assign v (Bool b)) c) '())]
     [(Prim 'read '())
      (values (Seq (Assign v (Prim 'read '())) c) '())]
-    [(Prim '- (list e))
-     (values (Seq (Assign v (Prim '- (list e))) c)
+    [(Prim op (list e))
+     (values (Seq (Assign v (Prim op (list e))) c)
              '())] 
-    [(Prim '+ (list e1 e2))
-     (values (Seq (Assign v (Prim '+ (list e1 e2))) c)
+    [(Prim op (list e1 e2))
+     (values (Seq (Assign v (Prim op (list e1 e2))) c)
              '())] 
     [(Var x)
      (values (Seq (Assign v (Var x)) c) '())]
     [(Let x e body) 
-     (define-values (c0tail let-binds) (explicate-assign body v c))
-     (define-values (c0tail^ let-binds^) (explicate-assign e (Var x) c0tail))
-     (values c0tail^ (cons x (append let-binds let-binds^)))]))
+     (define-values (c1tail let-binds) (explicate-assign body v c))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail))
+     (values c1tail^ (cons x (append let-binds let-binds^)))]
+    [(If e1 e2 e3)
+     (define label (gensym 'block))
+     (add-vertex! globalCFG (cons label c))
+     (define-values (c1tail-then let-binds-then) (explicate-assign e2 v (Goto label)))
+     (define-values (c1tail-else let-binds-else) (explicate-assign e3 v (Goto label)))
+     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
+     (values c1tail-new (append let-binds-then let-binds-else let-binds-new))
+     ]
+    ))
+
+;; explicate-pred : R2_exp x C1_tail x C1_tail -> C1_tail x var list
+(define (explicate-pred r2exp c1 c2)
+  (match r2exp
+    [(Bool b)
+     (values (if b c1 c2) '())]
+    [(Var v)
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG (cons label1 c1))
+     (add-vertex! globalCFG (cons label2 c2))
+     (values (IfStmt (Prim 'eq? (list r2exp (Bool #t))) (Goto label1) (Goto label2))
+             '())]
+    [(Prim op (list e))
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG (cons label1 c1))
+     (add-vertex! globalCFG (cons label2 c2))
+     (values (IfStmt r2exp (Goto label1) (Goto label2))
+             '())] 
+    [(Prim op (list e1 e2))
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG (cons label1 c1))
+     (add-vertex! globalCFG (cons label2 c2))
+     (values (IfStmt r2exp (Goto label1) (Goto label2))
+             '())]
+    [(If e1 e2 e3)
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG (cons label1 c1))
+     (add-vertex! globalCFG (cons label2 c2))
+     (define-values (c1tail-then let-binds-then) (explicate-pred e2 (Goto label1) (Goto label2)))
+     (define-values (c1tail-else let-binds-else) (explicate-pred e3 (Goto label1) (Goto label2)))
+     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
+     (values c1tail-new (append let-binds-then let-binds-else let-binds-new)) 
+     ]
+     ))
 
 ;; explicate-control : R1 -> C0
 (define (explicate-control p)
   (match p
     [(Program info e)
      (define-values (c0t let-binds) (explicate-tail e))
-     (Program (cons (cons 'locals let-binds) info) (CFG (list (cons 'start c0t))))]))
+     (Program (cons (cons 'locals let-binds) info) (CFG (append (list (cons 'start c0t)) (for/list ([l (get-vertices globalCFG)]) l))))]))
 
 (define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
 (define r1program-let (Program '() given-let))
