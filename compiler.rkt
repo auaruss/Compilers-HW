@@ -111,6 +111,12 @@
 	  'Boolean])]
       [(Prim op (list e1 e2))
        (match op
+         ['eq? 
+          (define Te1 ((type-check-exp env) e1))
+          (define Te2 ((type-check-exp env) e2))
+          (unless (equal? Te1 Te2)
+            (error "arguments to eq? must be the same type, not" Te1 'and Te2))
+	  'Boolean]
          [`,y #:when (boolean-operator? op)
           (define Te1 ((type-check-exp env) e1))
           (define Te2 ((type-check-exp env) e2))
@@ -147,7 +153,7 @@
       [else
         (error "type-check-exp couldn't match" e)])))
 
-(define (type-check-R2 env)
+(define (type-check env)
   (lambda (e)
     (match e
       [(Program info body)
@@ -156,6 +162,12 @@
           (error "result of the program must be an integer, not" Tb))
         (Program info body)]
 )))
+
+(define (type-check-R2 p)
+  (match p
+    [(Program info e)
+     ((type-check '()) p)]
+    ))
 
 (define r2p1 (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 (define r2p2 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Int 6)) (Prim 'read '())))))
@@ -263,19 +275,21 @@
      (values (Var tmp)
              (append ss `((,tmp . ,(Prim op new-es)))))]
     [(If e1 e2 e3)
-     (define-values (new-e1 s1) (rco-atom e1))
-     (define-values (new-e2 s2) (rco-atom e2))
-     (define-values (new-e3 s3) (rco-atom e3))
-     (define ss (append* (list s1 s2 s3)))
+     (define-values (new-es sss)
+       (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
+     (define ss (append* sss))
      (define tmp (gensym 'tmp))
-     (values (Var tmp) (append ss `((,tmp . ,(If new-e1 new-e2 new-e3)))))]
+     (match new-es
+	    [(list e1 e2 e3)
+	     (values (Var tmp)
+             (append ss `((,tmp . ,(If e1 e2 e3)))))])]
     ))
 
-(define (make-lets bs e)
+(define (make-lets^ bs e)
   (match bs
     [`() e]
     [`((,x . ,e^) . ,bs^)
-     (Let x e^ (make-lets bs^ e))]))
+     (Let x e^ (make-lets^ bs^ e))]))
 
 ;; rco-exp : exp -> exp
 (define (rco-exp e)
@@ -288,10 +302,15 @@
     [(Prim op es)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
-     (make-lets (append* sss) (Prim op new-es))]
+     (make-lets^ (append* sss) (Prim op new-es))]
     [(If e1 e2 e3)
-     (define-values (expression symbols) (rco-atom e))
-     (make-lets (append* symbols) expression)]
+     ;;(define-values (expression symbols) (rco-atom e))
+     ;;(make-lets^ (append* symbols) expression)]
+     (define-values (new-es sss)
+       (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
+     (match new-es
+	    [(list e1 e2 e3)
+	     (make-lets^ (append* sss) (If e1 e2 e3))])]
     ))
 
 

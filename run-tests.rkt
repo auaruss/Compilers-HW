@@ -3,6 +3,7 @@
 
 (require "utilities.rkt")
 (require "interp-R1.rkt")
+(require "interp-R2.rkt")
 (require "interp.rkt")
 (require "compiler.rkt")
 ;; (debug-level 1)
@@ -25,6 +26,20 @@
      ("print x86" ,print-x86 #f)
      ))
 
+(define r2-passes
+  `( 
+     ("shrink" ,shrink ,interp-R2)
+     ("uniquify" ,uniquify ,interp-R2)
+     ("remove complex opera*" ,remove-complex-opera* ,interp-R2)
+     #;("explicate control" ,explicate-control ,interp-C0)
+     #;("instruction selection" ,select-instructions ,R1-interp-x86)
+     #;("uncover live" ,uncover-live ,R1-interp-x86)
+     #;("build interference" ,build-interference ,R1-interp-x86)
+     #;("allocate registers" ,allocate-registers ,R1-interp-x86)
+     #;("patch instructions" ,patch-instructions ,R1-interp-x86)
+     #;("print x86" ,print-x86 #f)
+     ))
+
 (define all-tests
   (map (lambda (p) (car (string-split (path->string p) ".")))
        (filter (lambda (p)
@@ -39,6 +54,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r1" #f r1-passes interp-R1 "r1" (tests-for "r1"))
-(compiler-tests "r1" #f r1-passes "r1" (tests-for "r1"))
+(interp-tests "r2" type-check-R2 r2-passes interp-R2 "r2" (tests-for "r2"))
+#;(compiler-tests "r2" type-check-R2 r2-passes "r2" (tests-for "r2"))
 
