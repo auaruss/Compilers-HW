@@ -11,6 +11,7 @@
 (require racket/set)
 
 (define globalCFG (directed-graph '()))
+(define-vertex-property globalCFG instructions)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -447,7 +448,9 @@
      (values c1tail^ (cons x (append let-binds let-binds^)))]
     [(If e1 e2 e3)
      (define label (gensym 'block))
-     (add-vertex! globalCFG (cons label c))
+     #;(add-vertex! globalCFG (cons label c))
+     (add-vertex! globalCFG label)
+     (instructions-set! label c)
      (define-values (c1tail-then let-binds-then) (explicate-assign e2 v (Goto label)))
      (define-values (c1tail-else let-binds-else) (explicate-assign e3 v (Goto label)))
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
@@ -463,29 +466,45 @@
     [(Var v)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     (add-vertex! globalCFG (cons label1 c1))
-     (add-vertex! globalCFG (cons label2 c2))
+     #;(add-vertex! globalCFG (cons label1 c1))
+     #;(add-vertex! globalCFG (cons label2 c2))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
      (values (IfStmt (Prim 'eq? (list r2exp (Bool #t))) (Goto label1) (Goto label2))
              '())]
     [(Prim op (list e))
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     (add-vertex! globalCFG (cons label1 c1))
-     (add-vertex! globalCFG (cons label2 c2))
+     #;(add-vertex! globalCFG (cons label1 c1))
+     #;(add-vertex! globalCFG (cons label2 c2))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())] 
     [(Prim op (list e1 e2))
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     (add-vertex! globalCFG (cons label1 c1))
-     (add-vertex! globalCFG (cons label2 c2))
+     #;(add-vertex! globalCFG (cons label1 c1))
+     #;(add-vertex! globalCFG (cons label2 c2))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())]
     [(If e1 e2 e3)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     (add-vertex! globalCFG (cons label1 c1))
-     (add-vertex! globalCFG (cons label2 c2))
+     #;(add-vertex! globalCFG (cons label1 c1))
+     #;(add-vertex! globalCFG (cons label2 c2))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
      (define-values (c1tail-then let-binds-then) (explicate-pred e2 (Goto label1) (Goto label2)))
      (define-values (c1tail-else let-binds-else) (explicate-pred e3 (Goto label1) (Goto label2)))
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
@@ -498,7 +517,10 @@
   (match p
     [(Program info e)
      (define-values (c0t let-binds) (explicate-tail e))
-     (Program (cons (cons 'locals let-binds) info) (CFG (append (list (cons 'start c0t)) (for/list ([l (get-vertices globalCFG)]) l))))]))
+     (add-vertex! globalCFG 'start)
+     (instructions-set! 'start c0t) 
+     (define labeled-instruction-lists (for/list ([l (get-vertices globalCFG)]) (cons l (instructions l))))
+     (Program (cons (cons 'locals let-binds) info) (CFG labeled-instruction-lists))]))
 
 (define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
 (define r1program-let (Program '() given-let))
@@ -626,11 +648,21 @@
 
 ;; /Sam
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; uncover-live
+(define (add-global-CFG-edges label1 instr-ls)
+  (match instr-ls
+    ['() '()] ;;does nothing, just ends the function
+    [ls 
+      (match (car ls)
+	[(Jmp 'conclusion) (add-global-CFG-edges label1 (cdr ls))]
+        [(JmpIf cc label2) (add-directed-edge! globalCFG label1 label2) (add-global-CFG-edges label1 (cdr ls))]
+        [(Jmp label2) (add-directed-edge! globalCFG label1 label2) (add-global-CFG-edges label1 (cdr ls))]
+        [_ (add-global-CFG-edges label1 (cdr ls))]
+        )]
+    ))
 
 (define (instr-arg-varset arg)
   (match arg 
@@ -639,6 +671,10 @@
 
 (define (instr-read-varset instr) 
   (match instr
+	 [(Instr 'set (list e1 e2))
+	  (list->set '())]
+	 [(Instr 'movzbq (list e1 e2))
+	  (list->set '())]
 	 [(Instr 'movq (list e1 e2))
 	  (instr-arg-varset e1)]
 	 [(Instr op (list e1 e2))
@@ -649,6 +685,8 @@
 
 (define (instr-written-varset instr)
   (match instr
+	 [(Instr 'cmpq (list e1 e2))
+	  (list->set '())]
 	 [(Instr op (list e1 e2))
 	  (instr-arg-varset e2)]
 	 [(Instr 'negq (list e1))
@@ -666,10 +704,13 @@
 (define (uncover-live p)
   (match p
     [(Program info (CFG es)) 
+     (for ([ls es]) (add-global-CFG-edges (car ls) (match (cdr ls)
+							       [(Block b-info instr-ls) instr-ls])))
      (Program info (CFG (for/list ([ls es]) (cons (car ls) (match (cdr ls)
 							     [(Block b-info instr-ls) 
 							      (Block (uncover-live-helper (reverse instr-ls) (list->set '())) instr-ls)])))))]
     ))
+
 
 ;;Test from book chapter 3
 (define ch3example (Let 'v (Int 1) (Let 'w (Int 46) (Let 'x (Prim '+ (list (Var 'v) (Int 7))) (Let 'y (Prim '+ (list (Int 4) (Var 'x))) (Let 'z (Prim '+ (list (Var 'x) (Var 'w))) (Prim  '+ (list (Var 'z) (Prim '- (list (Var 'y)))))))))))
