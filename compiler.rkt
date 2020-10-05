@@ -597,14 +597,14 @@
      (append x86stmt x86tail)]
     [(Goto label)
      (list (Jmp label)) ]
-    [(IfStmt (list 'eq? arg1 arg2) (Goto label1) (Goto label2))
+    [(IfStmt (Prim 'eq? (list arg1 arg2)) (Goto label1) (Goto label2))
      (let ([arg1_ (sel-ins-atm arg1)]
            [arg2_ (sel-ins-atm arg2)])
        (list
         (Instr 'cmpq (list arg2_ arg1_))
         (JmpIf 'e label1)
         (Jmp label2)))]
-    [(IfStmt (list '< arg1 arg2) (Goto label1) (Goto label2))
+    [(IfStmt (Prim '< (list arg1 arg2)) (Goto label1) (Goto label2))
      (let ([arg1_ (sel-ins-atm arg1)]
            [arg2_ (sel-ins-atm arg2)])
        (list
@@ -618,6 +618,7 @@
     [(Program info (CFG es))
      (Program info (CFG (for/list ([ls es]) (cons (car ls) (Block '() (sel-ins-tail (cdr ls)))))))]))
 
+;;(explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2p8)))))
 ;; I think this is right...
 ;; todo: check/test !
 
