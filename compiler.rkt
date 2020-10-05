@@ -518,9 +518,10 @@
 
 (define (atm? c0exp)
     (match c0exp
-      [(Int n) true]
-      [(Var x) true]
-      [_ false]))
+      [(Int n) #t]
+      [(Var x) #t]
+      [(Bool b) #t]
+      [_ #f]))
 
 ; sel-ins-atm : C0atm -> pseudo-x86
 ; takes in a c0 atom and converts to pseudo-x86
@@ -528,7 +529,11 @@
 (define (sel-ins-atm c0a)
   (match c0a
     [(Int n) (Imm n)]
-    [(Var x) (Var x)]))
+    [(Var x) (Var x)]
+    [(Bool b) 
+     (match b
+      [#t (Imm 1)]
+      [#f (Imm 0)])]))
 
 ; sel-ins-stmt : C0stmt -> pseudo-x86
 ; takes in a c0 statement and converts to pseudo-x86
