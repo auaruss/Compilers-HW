@@ -1217,11 +1217,15 @@
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (match p
-    [(Program info (CFG es)) (format "~a:\n~a~a~a"
-                                     (label-name "start")
-                                     (format-x86 (Block-instr* (cdr (car es))))
-                                     (main-str (cdr (car info)))
-                                     (concl-str (cdr (car info))))]))
+    [(Program info (CFG es))
+     (format "~a~a~a"
+             (foldr string-append ""
+                    (for/list ([pair es])
+                      (string-append (label-name (car pair)) ":\n" (format-x86 (Block-instr* (cdr pair))))))
+             (main-str (cdr (car info)))
+             (concl-str (cdr (car info))))]))
+
+(define r2_58prog (Program '() (If (Prim '<= (list (Int 2) (Int 2))) (Int 42) (Int 0))))
 
 ;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (Program '() (Prim 'read (list)))))))))))))
 ;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program))))))))))
