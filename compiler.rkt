@@ -768,48 +768,73 @@
 ;; movzbq is similar to movq
 ;; consider register al the same as rax
 
-(define CALLER-SAVED-REGISTERS
-  '(rax rdx rcx rsi rdi r8 r9 r10 r11))
 
-(define (build-interference p)
-  (match p
-    [(Program info (CFG es))
-     (let ([l-after-k-and-instrs (match (cdr (car es)) 
-                                   [(Block b-info instr-ls) (zip b-info instr-ls)])])
-       (Program
-        (cons (cons 'conflicts
-                    (foldr (λ (pr g) (bi-helper (car pr) (cdr pr) g)) (undirected-graph '()) l-after-k-and-instrs))
-              info)
-        (CFG es)))]))
+(define caller-save-for-alloc '(%al rax rdx rcx rsi rdi r8 r9 r10 r11))
 
-(define (bi-helper s instr g)
-  (let ([ls (set->list s)])
-    (if (empty? ls)
-        g
-        (match instr
-          [(or (Instr 'addq (list s (Var d)))
-               (Instr 'subq (list s (Var d)))) 
-           (for/list ([v ls]) (if (eq? v d) (add-vertex! g d) 
-                                  (add-edge! g d v)))]
-          [(Instr 'callq label)
-           (for/list ([v ls]) (for/list ([r CALLER-SAVED-REGISTERS]) (add-edge! g r v)))]
-          [(or (Instr 'movq (list s (Var d)))
-	       (Instr 'movzbq (list s (Var d))))
-           (for/list ([v ls]) (if (or (eq? v d) (and (Var? s) (eq? v (Var-name s)))) (add-vertex! g d) 
-                                  (add-edge! g d v)))]
-          [whatever g]))
-    g))
+(define (free-vars arg)
+  (match arg
+    [(Var x) (set x)]
+    [(Reg r) (set r)]
+    [(Deref r i) (set r)]
+    [(Imm n) (set)]
+    [else (error "free vars, unhandled" arg)]))
 
-(define (zip l1 l2)
-  (if (or (empty? l1) (empty? l2))
-      '()
-      (cons (cons (car l1) (car l2)) (zip (cdr l1) (cdr l2)))))
+(define (write-vars instr)
+  (match instr
+    [(Instr 'movq (list s d)) (free-vars d)]
+    [(Instr name arg*)
+     (free-vars (last arg*))]
+    [(Jmp label) (set)]
+    [(Callq f) (set)]
+    [else (error "write-vars unmatched" instr)]))
 
-#;(build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))
-#;(get-edges
- (cdr
-  (assv 'conflicts
-        (Program-info (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* ch3program)))))))))
+(define (build-interference-instr live-after g)
+  (λ (ast)
+    (match ast
+      [(Instr 'movq (list s d))
+       (for ([v live-after])
+         (for ([d (free-vars d)])
+           (cond [(equal? (Var v) s) (verbose "same source" s)]
+                 [(equal? v d) (verbose "skip self edge on" d)]
+                 [else (add-edge! g d v)])))
+       ast]
+      [(Callq f)
+       (for ([v live-after])
+         (for ([u caller-save-for-alloc])
+           (if (equal? v u)
+               (verbose "skip self edge on" v)
+               (add-edge! g u v))))
+       ast]
+      [else
+       (for ([v live-after])
+         (for ([d (write-vars ast)])
+           (if (equal? v d)
+               (verbose "skip self edge on" v)
+               (add-edge! g d v))))
+       ast])))
+                       
+                  
+
+(define (build-interference-block ast g)
+  (match ast
+    [(Block info ss)
+     (let* ([lives (dict-ref info 'lives)]
+            [live-afters (cdr lives)]
+            [new-ss (for/list ([inst ss] [live-after live-afters])
+                      ((build-interference-instr live-after g) inst))]
+            [new-info (dict-remove info 'lives)])
+       (Block info ss))]))
+
+(define (build-interference ast)
+  (match ast
+    [(Program info (CFG cfg))
+     (let* ([locals (dict-ref info 'locals)]
+            [g (undirected-graph '())])
+       (for ([v locals]) (add-vertex! g v))
+       (let* ([new-cfg (for/list ([(label block) (in-dict cfg)])
+                         (cons label (build-interference-block block g)))]
+              [new-info (dict-set info 'conflicts g)])
+         (Program new-info (CFG new-cfg))))]))
 
 ;; allocate-registers
 
@@ -867,22 +892,22 @@
 (define h1 (make-hash '((t . ()) (z . ()) (y . ()) (w . ()) (x . ()) (v . ()))))
 (define testhash (hash 't '(a e w) 'z '() 'y '(w q f f d) 'w '() 'x '(z a) 'v '(e)))
 
-(define ch3ig
+#;(define ch3ig
   (match (build-interference (uncover-live (select-instructions
                                             (explicate-control (remove-complex-opera* (uniquify ch3program))))))
     [(Program info CFG) (dict-ref info 'conflicts)]))
 
-(define r1-11ig
+#;(define r1-11ig
   (match (build-interference (uncover-live (select-instructions
                                             (explicate-control (remove-complex-opera* (uniquify r1-11prog))))))
     [(Program info CFG) (dict-ref info 'conflicts)]))
 
-(define r1-12ig
+#;(define r1-12ig
   (match (build-interference (uncover-live (select-instructions
                                             (explicate-control (remove-complex-opera* (uniquify r1-12prog))))))
     [(Program info CFG) (dict-ref info 'conflicts)]))
 
-(define asdig
+#;(define asdig
   (match (build-interference (uncover-live (select-instructions
                                             (explicate-control (remove-complex-opera* (uniquify asdp))))))
     [(Program info CFG) (dict-ref info 'conflicts)]))
