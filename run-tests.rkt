@@ -29,7 +29,7 @@
      ))
 
 (define r2-passes
-  `( 
+  `(
      ("shrink" ,shrink ,interp-R2)
      ("uniquify" ,uniquify ,interp-R2)
      ("remove complex opera*" ,remove-complex-opera* ,interp-R2)
