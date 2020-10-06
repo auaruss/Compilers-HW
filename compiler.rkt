@@ -1027,6 +1027,14 @@
 
 (define (patch-instructions-instr px86instr)
   (match px86instr
+    [(Instr 'cmpq (list e1 e2))
+     (match e2
+       [(Imm n) (list (Instr 'movq (list e2 (Reg 'rax))) (Instr 'cmpq (list e1 (Reg 'rax))))]
+       [_ (list (Instr 'cmpq (list e1 e2)))])]
+    [(Instr 'movzbq (list e1 e2))
+     (match e2 
+       [(Deref reg n) (list (Instr 'movq (list e2 (Reg 'rax))) (Instr 'movzbq (list e1 (Reg 'rax))))]
+       [_ (list (Instr 'movzbq (list e1 e2)))])]
     [(Instr op (list e1 e2)) 
      (match (list e1 e2)
        [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr op (list (Reg 'rax) e2)))]
