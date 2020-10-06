@@ -793,7 +793,8 @@
                                   (add-edge! g d v)))]
           [(Instr 'callq label)
            (for/list ([v ls]) (for/list ([r CALLER-SAVED-REGISTERS]) (add-edge! g r v)))]
-          [(Instr 'movq (list s (Var d)))
+          [(or (Instr 'movq (list s (Var d)))
+	       (Instr 'movzbq (list s (Var d))))
            (for/list ([v ls]) (if (or (eq? v d) (and (Var? s) (eq? v (Var-name s)))) (add-vertex! g d) 
                                   (add-edge! g d v)))]
           [whatever g]))
