@@ -35,7 +35,7 @@
      ("remove complex opera*" ,remove-complex-opera* ,interp-R2)
      ("explicate control" ,explicate-control ,interp-C1)
      ("instruction selection" ,select-instructions ,R2-interp-x86)
-     #;("uncover live" ,uncover-live ,R1-interp-x86)
+     ("uncover live" ,uncover-live ,R2-interp-x86)
      #;("build interference" ,build-interference ,R1-interp-x86)
      #;("allocate registers" ,allocate-registers ,R1-interp-x86)
      #;("patch instructions" ,patch-instructions ,R1-interp-x86)

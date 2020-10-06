@@ -12,6 +12,7 @@
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
+(define-vertex-property globalCFG live-before-set)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -451,6 +452,7 @@
      #;(add-vertex! globalCFG (cons label c))
      (add-vertex! globalCFG label)
      (instructions-set! label c)
+     (live-before-set-set! label (list->set '()))
      (define-values (c1tail-then let-binds-then) (explicate-assign e2 v (Goto label)))
      (define-values (c1tail-else let-binds-else) (explicate-assign e3 v (Goto label)))
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
@@ -470,8 +472,10 @@
      #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
      (values (IfStmt (Prim 'eq? (list r2exp (Bool #t))) (Goto label1) (Goto label2))
              '())]
     [(Prim op (list e))
@@ -481,8 +485,10 @@
      #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())] 
     [(Prim op (list e1 e2))
@@ -492,8 +498,10 @@
      #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())]
     [(If e1 e2 e3)
@@ -503,8 +511,10 @@
      #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
      (define-values (c1tail-then let-binds-then) (explicate-pred e2 (Goto label1) (Goto label2)))
      (define-values (c1tail-else let-binds-else) (explicate-pred e3 (Goto label1) (Goto label2)))
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
@@ -696,20 +706,39 @@
 	  (instr-arg-varset e1)]
 	 [_ (list->set '())]))
 
-(define (uncover-live-helper instr-ls live-after-set)
+(define (uncover-live-helper instr-ls live-after-set label)
   (cond
-    [(null? instr-ls) (list (list->set '()))]
+    #;[(null? instr-ls) (list (list->set '()))]
+    [(null? instr-ls) (live-before-set-set! label live-after-set) (list live-after-set)]
     [else (let ([new-live-after-set (set-union (set-subtract live-after-set (instr-written-varset (car instr-ls))) (instr-read-varset (car instr-ls)))]) 
-	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set) (list live-after-set)))]
+	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set label) (list live-after-set)))]
     ))
 
+(define (get-first-live ls)
+  (match ls
+    ['() (list->set '())]
+    [else (set-union (live-before-set (car ls)) (get-first-live (cdr ls)))]
+    )
+  )
+
+(define (find-instructions label es)
+  (if (eq? label (car (car es))) 
+      (match (cdr (car es))
+        [(Block b-info ls) ls])
+      (find-instructions label (cdr es)))
+  )
+
+(define (sort-blocks ordered-vertices es)
+  (for/list ([label ordered-vertices]) 
+	    (define first-live-after-set (get-first-live (get-neighbors (transpose globalCFG) label)))
+	    (cons label (Block (uncover-live-helper (reverse (find-instructions label es)) first-live-after-set label) (find-instructions label es)))))
 
 (define (uncover-live p)
   (match p
     [(Program info (CFG es)) 
      (for ([ls es]) (add-global-CFG-edges (car ls) (match (cdr ls)
 							       [(Block b-info instr-ls) instr-ls])))
-     (Program info (CFG (for/list ([ls es]) (cons (car ls) (match (cdr ls)
+     (Program info (CFG (sort-blocks (tsort (transpose globalCFG)) es) #;(for/list ([ls es]) (cons (car ls) (match (cdr ls)
 							     [(Block b-info instr-ls) 
 							      (Block (uncover-live-helper (reverse instr-ls) (list->set '())) instr-ls)])))))]
     ))
