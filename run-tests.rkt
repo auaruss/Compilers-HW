@@ -38,8 +38,8 @@
      ("uncover live" ,uncover-live ,R2-interp-x86)
      ("build interference" ,build-interference ,R2-interp-x86)
      ("allocate registers" ,allocate-registers ,R2-interp-x86)
-     #;("patch instructions" ,patch-instructions ,R1-interp-x86)
-     #;("print x86" ,print-x86 #f)
+     ("patch instructions" ,patch-instructions ,R2-interp-x86)
+     ("print x86" ,print-x86 #f)
      ))
 
 (define all-tests
@@ -57,5 +57,5 @@
         all-tests)))
 
 (interp-tests "r2" type-check-R2 r2-passes interp-R2 "r2" (tests-for "r2"))
-#;(compiler-tests "r2" type-check-R2 r2-passes "r2" (tests-for "r2"))
+(compiler-tests "r2" type-check-R2 r2-passes "r2" (tests-for "r2"))
 

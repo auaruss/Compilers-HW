@@ -1019,6 +1019,7 @@
 (define (allocate-registers p)
   (match p
     [(Program info (CFG es))
+     (for ([vertex (get-vertices globalCFG)]) (remove-vertex! globalCFG vertex))
      (let ([coloring (color-graph (dict-ref info 'conflicts)
                                   (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals))))])
        (Program (list (cons 'stack-space (let ([f (* 8 (- (if (> (length coloring) 0)
@@ -1038,7 +1039,8 @@
 
 (define r2_1_program (Program '() (Let 'x (Bool #t) (Int 42))))
 (define r2_12_program (Program '() (If (If (Prim 'not (list (Bool #t))) (Bool #f) (Bool #t)) (Int 42) (Int 777))))
-#;(allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_12_program)))))))))
+(define r2_15_program (Program '() (If (Prim 'eq? (list (Let 'x (Int 42) (If (Prim 'eq? (list (Var 'x) (Int 42))) (Var 'x) (Int 20))) (Int 42))) (Int 42) (Int 777))))
+;;(allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))))
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
 (define (calc-stack-space ls)
@@ -1174,6 +1176,21 @@
      (define st1 (stringify-arg a1))
      (define st2 (stringify-arg a2))
      (format "movq\t~a, ~a" st1 st2)]
+    [(Instr 'movzbq (list a1 a2))
+     (define st1 (stringify-arg a1))
+     (define st2 (stringify-arg a2))
+     (format "movzbq\t~a, ~a" st1 st2)]
+    [(Instr 'xorq (list a1 a2))
+     (define st1 (stringify-arg a1))
+     (define st2 (stringify-arg a2))
+     (format "xorq\t~a, ~a" st1 st2)]
+    [(Instr 'cmpq (list a1 a2))
+     (define st1 (stringify-arg a1))
+     (define st2 (stringify-arg a2))
+     (format "cmpq\t~a, ~a" st1 st2)]
+    [(Instr 'set (list cc a1))
+     (define st1 (stringify-arg a1))
+     (format "set~a\t~a" cc st1)]
     [(Instr 'negq (list a))
      (define st (stringify-arg a))
      (format "negq\t~a" st)]
@@ -1187,7 +1204,9 @@
      (define st (stringify-arg arg))
      (format "popq\t~a" st)]
     [(Jmp lbl)
-     (format "jmp\t~a" (label-name lbl))]))
+     (format "jmp\t~a" (label-name lbl))]
+    [(JmpIf cc lbl)
+     (format "j~a \t~a" cc (label-name lbl))]))
 
 ;; format-x86 : [instr] -> string
 (define (format-x86 ins)
