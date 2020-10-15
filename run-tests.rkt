@@ -57,5 +57,5 @@
         all-tests)))
 
 (interp-tests "r2" type-check-R2 r2-passes interp-R2 "r2" (tests-for "r2"))
-(compiler-tests "r2" type-check-R2 r2-passes "r2" (tests-for "r2"))
+#;(compiler-tests "r2" type-check-R2 r2-passes "r2" (tests-for "r2"))
 

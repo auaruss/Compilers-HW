@@ -732,7 +732,7 @@
 
 (define (sort-blocks ordered-vertices es)
   (for/list ([label ordered-vertices]) 
-	    (define first-live-after-set (get-first-live (get-neighbors (transpose globalCFG) label)))
+	    (define first-live-after-set (get-first-live (get-neighbors globalCFG label)))
 	    (cons label (Block (uncover-live-helper (reverse (find-instructions label es)) first-live-after-set label) (find-instructions label es)))))
 
 (define (uncover-live p)
@@ -1040,7 +1040,15 @@
 (define r2_1_program (Program '() (Let 'x (Bool #t) (Int 42))))
 (define r2_12_program (Program '() (If (If (Prim 'not (list (Bool #t))) (Bool #f) (Bool #t)) (Int 42) (Int 777))))
 (define r2_15_program (Program '() (If (Prim 'eq? (list (Let 'x (Int 42) (If (Prim 'eq? (list (Var 'x) (Int 42))) (Var 'x) (Int 20))) (Int 42))) (Int 42) (Int 777))))
-;;(allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))))
+#;(uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))
+#;(for/list ([e (get-vertices globalCFG)]) (cons e (get-neighbors (transpose globalCFG) e)))
+#;(match (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))
+       [(Program info (CFG es))
+		 (for/list ([p es]) (match (cdr p) 
+				      [(Block info es) 
+				       (cons (car p) info)]))])
+
+#;(allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))))
 ;; assign-homes : pseudo-x86 -> pseudo-x86
 
 (define (calc-stack-space ls)
