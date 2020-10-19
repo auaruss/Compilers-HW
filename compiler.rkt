@@ -92,9 +92,8 @@
 
 (define (type-check-exp env)
   (lambda (e)
-    (define recur (type-check-exp env))
     (match e
-      [(Var x) (HasType e (dict-ref env x))]
+      [(Var x) (dict-ref env x)]
       [(Int n) (HasType e 'Integer)]
       [(Bool b) (HasType e 'Boolean)]
       [(Let x e body)
@@ -106,18 +105,20 @@
       [(Void) 
        (HasType e 'Void)]
       [(Prim 'vector es)
-        (define t* (for/list ([e es]) (recur e)))
+        (define t* (for/list ([e es]) (match ((type-check-exp env) e)
+			               [(HasType e^ t) t])))
         (let ([t `(Vector ,@t*)])
-          #;(debug "vector/type-check-exp finished vector" t)
-          (HasType e t))]
-      [(Prim 'vector-ref (list e i))
-        (define Te (recur e))
+	  (HasType e t))]
+      [(Prim 'vector-ref (list e1 i))
+        (define Te ((type-check-exp env) e1))
         (match Te
          [(HasType e* `(Vector ,ts ...))
-          (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
-            (error 'type-check-exp "invalid index ~a" i))
-          (let ([t (list-ref ts i)])
-	    (HasType e t))]
+	   (match i
+	    [(Int n)
+	    (unless (and (exact-nonnegative-integer? n) (< n (length ts)))
+              (error 'type-check-exp "invalid index ~a" n))
+            (let ([t (list-ref ts n)])
+	        (HasType e t))])]
          [else (error "expected a vector in vector-ref, not" Te)])]
       [(Prim 'vector-set (list e1 e2 e3))
         (define Te1 ((type-check-exp env) e1))
@@ -125,8 +126,10 @@
         (define Te3 ((type-check-exp env) e3))
         (match Te1
          [(HasType e* `(Vector ,ts ...))
-          (unless (and (exact-nonnegative-integer? e2) (< e2 (length ts)))
-            (error 'type-check-exp "invalid index ~a" e2))]
+	   (match e2
+	    [(Int n)
+              (unless (and (exact-nonnegative-integer? n) (< n (length ts)))
+                (error 'type-check-exp "invalid index ~a" n))])]
          [else (error "expected a vector in vector-set, not" Te1)])
         (HasType e 'Void)]
       [(Prim op (list)) (HasType e 'Integer)]
@@ -241,8 +244,9 @@
 (define r2p3 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Bool #t)) (Prim 'read '())))))
 (define r2p4 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Bool #f) (Bool #t)) (Prim 'read '())))))
 (define r3_1 (Program '() (Let 'v (Prim 'vector (list (Int 1) (Int 2))) (Int 42))))
+(define r3_2 (Program '() (Let 'v (Prim 'vector (list (Int 20) (Int 22))) (Prim '+ (list (Prim 'vector-ref (list (Var 'v) (Int 0))) (Prim 'vector-ref (list (Var 'v) (Int 1))))))))
 
-#;(type-check-R3 r3_1)
+#;(type-check-R3 r3_2)
 
 ;;Shrink Pass: R2 -> R2
 (define (shrink-exp e)
