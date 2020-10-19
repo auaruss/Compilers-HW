@@ -100,85 +100,115 @@
       [(Let x e body)
         (define Te ((type-check-exp env) e))
         (define Tb ((type-check-exp (dict-set env x Te)) body))
-        (HasType e Tb)]
+        (match Tb 
+	 [(HasType e^ t) 
+	  (HasType e t)])]
+      [(Void) 
+       (HasType e 'Void)]
+      [(Prim 'vector es)
+        (define t* (for/list ([e es]) (recur e)))
+        (let ([t `(Vector ,@t*)])
+          #;(debug "vector/type-check-exp finished vector" t)
+          (HasType e t))]
+      [(Prim 'vector-ref (list e i))
+        (define Te (recur e))
+        (match Te
+         [(HasType e* `(Vector ,ts ...))
+          (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
+            (error 'type-check-exp "invalid index ~a" i))
+          (let ([t (list-ref ts i)])
+	    (HasType e t))]
+         [else (error "expected a vector in vector-ref, not" Te)])]
+      [(Prim 'vector-set (list e1 e2 e3))
+        (define Te1 ((type-check-exp env) e1))
+        (define Te2 ((type-check-exp env) e2))
+        (define Te3 ((type-check-exp env) e3))
+        (match Te1
+         [(HasType e* `(Vector ,ts ...))
+          (unless (and (exact-nonnegative-integer? e2) (< e2 (length ts)))
+            (error 'type-check-exp "invalid index ~a" e2))]
+         [else (error "expected a vector in vector-set, not" Te1)])
+        (HasType e 'Void)]
       [(Prim op (list)) (HasType e 'Integer)]
       [(Prim op (list e1)) 
        (match op
 	 ['-   
           (define Te ((type-check-exp env) e1))
-          (unless (equal? Te 'Integer)
-            (error "argument to an arithmetic operator must be an integer, not" Te))
-	  (HasType e 'Integer)]
+          (match Te 
+	   [(HasType e^ t)
+	    (unless (equal? t 'Integer)
+              (error "argument to an arithmetic operator must be an integer, not" t))
+	    (HasType e 'Integer)])]
 	 ['not 
           (define Te ((type-check-exp env) e1))
-          (unless (equal? Te 'Boolean)
-            (error "argument to a boolean operator must be a boolean, not" Te))
-	  (HasType e 'Boolean)])]
+          (match Te 
+	   [(HasType e^ t)
+            (unless (equal? t 'Boolean)
+              (error "argument to a boolean operator must be a boolean, not" t))
+	    (HasType e 'Boolean)])])]
       [(Prim op (list e1 e2))
        (match op
          ['eq? 
           (define Te1 ((type-check-exp env) e1))
           (define Te2 ((type-check-exp env) e2))
-          (unless (equal? Te1 Te2)
-            (error "arguments to eq? must be the same type, not" Te1 'and Te2))
-	  (HasType e 'Boolean)]
+          (match Te1 
+	   [(HasType e1^ t1)
+            (match Te2 
+	     [(HasType e2^ t2)
+              (unless (equal? t1 t2)
+                (error "arguments to eq? must be the same type, not" t1 'and t2))
+	      (HasType e 'Boolean)])])]
          [`,y #:when (boolean-operator? op)
           (define Te1 ((type-check-exp env) e1))
           (define Te2 ((type-check-exp env) e2))
-          (unless (equal? Te1 'Boolean)
-            (error "argument to a boolean operator must be a boolean, not" Te1))
-          (unless (equal? Te2 'Boolean)
-            (error "argument to a boolean operator must be a boolean, not" Te2))
-	  (HasType e 'Boolean)]
+          (match Te1 
+	   [(HasType e1^ t1)
+            (match Te2 
+	     [(HasType e2^ t2)
+              (unless (equal? t1 'Boolean)
+                (error "argument to a boolean operator must be a boolean, not" t1))
+              (unless (equal? t2 'Boolean)
+                (error "argument to a boolean operator must be a boolean, not" t2))
+	      (HasType e 'Boolean)])])]
          [`,y #:when (comparison-operator? op)
           (define Te1 ((type-check-exp env) e1))
           (define Te2 ((type-check-exp env) e2))
-          (unless (equal? Te1 'Integer)
-            (error "argument to a comparison operator must be a integer, not" Te1))
-          (unless (equal? Te2 'Integer)
-            (error "argument to a copmarison operator must be an integer, not" Te2))
-	  (HasType e 'Boolean)]
+          (match Te1 
+	   [(HasType e1^ t1)
+            (match Te2 
+	     [(HasType e2^ t2)
+              (unless (equal? t1 'Integer)
+                (error "argument to a comparison operator must be a integer, not" t1))
+              (unless (equal? t2 'Integer)
+                (error "argument to a copmarison operator must be an integer, not" t2))
+	      (HasType e 'Boolean)])])]
 	 [else
           (define Te1 ((type-check-exp env) e1))
           (define Te2 ((type-check-exp env) e2))
-          (unless (equal? Te1 'Integer)
-            (error "argument to an arithmetic operator must be an integer, not" Te1))
-          (unless (equal? Te2 'Integer)
-            (error "argument to an arithmetic operator must be an integer, not" Te2))
-         (HasType e 'Integer)])] 
+          (match Te1 
+	   [(HasType e1^ t1)
+            (match Te2 
+	     [(HasType e2^ t2)
+              (unless (equal? t1 'Integer)
+                (error "argument to an arithmetic operator must be an integer, not" t1))
+              (unless (equal? t2 'Integer)
+                (error "argument to an arithmetic operator must be an integer, not" t2))
+             (HasType e 'Integer)])])])] 
       [(If e1 e2 e3)
           (define Te1 ((type-check-exp env) e1))
           (define Te2 ((type-check-exp env) e2))
           (define Te3 ((type-check-exp env) e3))
-          (unless (equal? Te1 'Boolean)
-            (error "If condition must be a boolean, not" Te1))
-          (unless (equal? Te2 Te3)
-            (error "branches of an if statement must be the same type, not" Te2 'and Te3))
-	  (HasType e Te2)]
-      #;['(void) (values '(has-type (void) Void) 'Void)]
-      #;[`(vector ,es ...)
-        (define-values (e* t*) (for/lists (e* t*) ([e es])
-                                (recur e)))
-        (let ([t `(Vector ,@t*)])
-          (debug "vector/type-check-exp finished vector" t)
-          (values `(has-type (vector ,@e*) ,t) t))]
-      #;[`(vector-ref ,e ,i)
-        (define-values (e^ t) (recur e))
-        (match t
-         [`(Vector ,ts ...)
-          (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
-            (error 'type-check-exp "invalid index ~a" i))
-          (let ([t (list-ref ts i)])
-            (values `(has-type (vector-ref ,e^ (has-type ,i Integer)) ,t)
-                   t))]
-         [else (error "expected a vector in vector-ref, not" t)])]
-      #;[`(eq? ,arg1 ,arg2)
-        (define-values (e1 t1) (recur arg1))
-        (define-values (e2 t2) (recur arg2))
-        (match* (t1 t2)
-          [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
-           (values `(has-type (eq? ,e1 ,e2) Boolean) 'Boolean)]
-          [(other wise) ((super type-check-exp env) e)])]
+          (match Te1 
+	   [(HasType e1^ t1)
+            (match Te2 
+	     [(HasType e2^ t2)
+              (match Te3 
+	       [(HasType e3^ t3)
+                (unless (equal? t1 'Boolean)
+                  (error "If condition must be a boolean, not" t1))
+                (unless (equal? t2 t3)
+                  (error "branches of an if statement must be the same type, not" t2 'and t3))
+	        (HasType e t2)])])])]
       [else
         (error "type-check-exp couldn't match" e)])))
 
@@ -187,9 +217,11 @@
     (match e
       [(Program info body)
         (define Tb ((type-check-exp '()) body))
-        (unless (equal? Tb 'Integer)
-          (error "result of the program must be an integer, not" Tb))
-        (Program info body)]
+        (match Tb
+	 [(HasType e^ t)
+	  (unless (equal? t 'Integer)
+            (error "result of the program must be an integer, not" Tb))
+          (Program info body)])]
 )))
 
 (define (type-check-R3 p)
@@ -208,8 +240,9 @@
 (define r2p2 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Int 6)) (Prim 'read '())))))
 (define r2p3 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Bool #t)) (Prim 'read '())))))
 (define r2p4 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Bool #f) (Bool #t)) (Prim 'read '())))))
+(define r3_1 (Program '() (Let 'v (Prim 'vector (list (Int 1) (Int 2))) (Int 42))))
 
-;;((type-check-R2 '()) r2p4)
+#;(type-check-R3 r3_1)
 
 ;;Shrink Pass: R2 -> R2
 (define (shrink-exp e)

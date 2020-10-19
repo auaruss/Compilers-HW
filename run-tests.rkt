@@ -3,9 +3,11 @@
 
 (require "utilities.rkt")
 #;(require "interp-R1.rkt")
-(require "interp-R2.rkt")
+#;(require "interp-R2.rkt")
+(require "interp-R3.rkt")
 #;(require "interp-C0.rkt")
-(require "interp-C1.rkt")
+#;(require "interp-C1.rkt")
+#;(require "interp-C2.rkt")
 (require "interp.rkt")
 (require "compiler.rkt")
 (AST-output-syntax 'abstract-syntax)
@@ -28,7 +30,7 @@
      ("print x86" ,print-x86 #f)
      ))
 
-(define r2-passes
+#;(define r2-passes
   `(
      ("shrink" ,shrink ,interp-R2)
      ("uniquify" ,uniquify ,interp-R2)
@@ -40,6 +42,21 @@
      ("allocate registers" ,allocate-registers ,R2-interp-x86)
      ("patch instructions" ,patch-instructions ,R2-interp-x86)
      ("print x86" ,print-x86 #f)
+     ))
+
+(define r3-passes
+  `(
+     #;("shrink" ,shrink ,interp-R3)
+     #;("uniquify" ,uniquify ,interp-R3)
+     #;("expose allocation" ,expose-allocation ,interp-R3)
+     #;("remove complex opera*" ,remove-complex-opera* ,interp-R3)
+     #;("explicate control" ,explicate-control ,interp-C2)
+     #;("instruction selection" ,select-instructions ,R3-interp-x86)
+     #;("uncover live" ,uncover-live ,R3-interp-x86)
+     #;("build interference" ,build-interference ,R3-interp-x86)
+     #;("allocate registers" ,allocate-registers ,R3-interp-x86)
+     #;("patch instructions" ,patch-instructions ,R3-interp-x86)
+     #;("print x86" ,print-x86 #f)
      ))
 
 (define all-tests
@@ -56,6 +73,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r2" type-check-R2 r2-passes interp-R2 "r2" (tests-for "r2"))
-#;(compiler-tests "r2" type-check-R2 r2-passes "r2" (tests-for "r2"))
+(interp-tests "r3" type-check-R3 r3-passes interp-R3 "r3" (tests-for "r3"))
+#;(compiler-tests "r3" type-check-R3 r3-passes "r3" (tests-for "r3"))
 
