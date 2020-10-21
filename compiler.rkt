@@ -225,15 +225,25 @@
 ;;Shrink Pass: R2 -> R2
 (define (shrink-exp e)
   (match e
-    [(Prim '- (list e1 e2)) (Prim '+ (list (shrink-exp e1) (Prim '- (list (shrink-exp e2)))))]
-    [(Prim 'and (list e1 e2)) (If (shrink-exp e1) (If (shrink-exp e2) (Bool #t) (Bool #f)) (Bool #f))]
-    [(Prim 'or (list e1 e2)) (If (shrink-exp e1) (Bool #t) (If (shrink-exp e2) (Bool #t) (Bool #f)))]
-    [(Prim '<= (list e1 e2)) (Prim 'not (list (shrink-exp (Prim '> (list e1 e2)))))]
-    [(Prim '> (list e1 e2)) (let ([new-tmp (gensym 'tmp)]) (Let new-tmp (shrink-exp e1) (Prim '< (list (shrink-exp e2) (Var new-tmp)))))]
-    [(Prim '>= (list e1 e2)) (Prim 'not (list (shrink-exp (Prim '< (list e1 e2)))))]
-    [(Prim op (list e1)) (Prim op (list (shrink-exp e1)))]
-    [(Prim op (list e1 e2)) (Prim op (list (shrink-exp e1) (shrink-exp e2)))]
-    [(If e1 e2 e3) (If (shrink-exp e1) (shrink-exp e2) (shrink-exp e3))]
+    [(HasType (Prim '- (list e1 e2)) 'Integer) 
+     (HasType (Prim '+ (list (shrink-exp e1) (HasType (Prim '- (list (shrink-exp e2))) 'Integer))) 'Integer)]
+    [(HasType (Prim 'and (list e1 e2)) 'Boolean) 
+     (HasType (If (shrink-exp e1) (HasType (If (shrink-exp e2) (HasType (Bool #t) 'Boolean) (HasType (Bool #f) 'Boolean)) 'Boolean) (HasType (Bool #f) 'Boolean)) 'Boolean)]
+    [(HasType (Prim 'or (list e1 e2)) 'Boolean)
+     (HasType (If (shrink-exp e1) (HasType (Bool #t) 'Boolean) (HasType (If (shrink-exp e2) (HasType (Bool #t) 'Boolean) (HasType (Bool #f) 'Boolean)) 'Boolean)) 'Boolean)]
+    [(HasType (Prim '<= (list e1 e2)) 'Boolean)
+     (HasType (Prim 'not (list (shrink-exp (HasType (Prim '> (list e1 e2)) 'Boolean)))) 'Boolean)]
+    [(HasType (Prim '> (list e1 e2)) 'Boolean)
+     (let ([new-tmp (gensym 'tmp)]) 
+       (HasType (Let new-tmp (shrink-exp e1) (HasType (Prim '< (list (shrink-exp e2) (HasType (Var new-tmp) 'Integer))) 'Boolean)) 'Boolean))]
+    [(HasType (Prim '>= (list e1 e2)) 'Boolean) 
+     (HasType (Prim 'not (list (shrink-exp (HasType (Prim '< (list e1 e2)) 'Boolean)))) 'Boolean)]
+    [(HasType (Prim op (list e1)) type)
+     (HasType (Prim op (list (shrink-exp e1))) type)]
+    [(HasType (Prim op (list e1 e2)) type)
+     (HasType (Prim op (list (shrink-exp e1) (shrink-exp e2))) 'type)]
+    [(HasType (If e1 e2 e3) type)
+     (HasType (If (shrink-exp e1) (shrink-exp e2) (shrink-exp e3)) type)]
     [else e]
     ))
 

@@ -46,7 +46,7 @@
 
 (define r3-passes
   `(
-     #;("shrink" ,shrink ,interp-R3)
+     ("shrink" ,shrink ,interp-R3)
      #;("uniquify" ,uniquify ,interp-R3)
      #;("expose allocation" ,expose-allocation ,interp-R3)
      #;("remove complex opera*" ,remove-complex-opera* ,interp-R3)
