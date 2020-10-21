@@ -219,8 +219,14 @@
 (define r2p4 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Bool #f) (Bool #t)) (Prim 'read '())))))
 (define r3_1 (Program '() (Let 'v (Prim 'vector (list (Int 1) (Int 2))) (Int 42))))
 (define r3_2 (Program '() (Let 'v (Prim 'vector (list (Int 20) (Int 22))) (Prim '+ (list (Prim 'vector-ref (list (Var 'v) (Int 0))) (Prim 'vector-ref (list (Var 'v) (Int 1))))))))
-
-#;(type-check-R3 r3_2)
+(define r3_15 (Program '() 
+		       (Let 'v1 (Prim 'vector (list (Int 0))) 
+			    (Let 'g1 (Prim 'vector (list (Int 1) (Int 2) (Int 3) (Int 4) (Int 5)))
+				 (Let 'dummy (If (Prim 'eq? (list (Prim 'read '()) (Int 0)))
+                                                 (Prim 'vector-set (list (Var 'v1) (Int 0) (Int 42)))
+                                                 (Prim 'vector-set (list (Var 'g1) (Int 0) (Int 42))))
+				      (Prim 'vector-ref (list (Var 'v1) (Int 0))))))))
+#;(type-check-R3 r3_15)
 
 ;;Shrink Pass: R2 -> R2
 (define (shrink-exp e)
