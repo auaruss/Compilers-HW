@@ -341,6 +341,48 @@
 
 ;;(interp-R2 (uniquify (shrink ((type-check-R2 '()) r2p8))))
 
+
+(define (expose-allocation p)
+  (match p
+      [(Program info e)
+       (Program info ((expose-allocation-exp '()) e))]))
+
+(define (expose-allocation-exp env)
+  (λ (e)
+    (define recur (expose-allocation-exp env))
+    (match (e)
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Bool b) (Bool b)]
+      [(Let x rhs body)
+       (Let (recur x) (recur rhs) body)]
+      [(Prim 'vector-ref (list exp int))
+       (Prim 'vector-ref (list (recur exp) int))]
+      [(Prim 'vector-set (list exp1 int exp2))
+       (Prim 'vector-set (list (recur exp1) int (recur exp2)))]
+      [(Prim op es)
+       (Prim op (map recur es))]
+      [(If e1 e2 e3)
+       (If (recur e1) (recur e2) (recur e3))]
+      [(HasType (Prim 'vector exps) type)
+       (define es (map recur exps))
+       (define i 0)
+       (define bytes (* 8 (add1 (length exps))))
+       (define vecs (λ (v) (for-each (λ (_)
+                                      (vector-set! v i _)
+                                      (set! i (add1 i))
+                                      )
+                                    es)))
+       (let ([_ (if (< (+ (GlobalValue free_ptr) bytes)
+                       (GlobalValue fromspace_end))
+                    (void)
+                    (collect bytes))])
+         (let ([v (allocate len type)])
+           (vecs v)))]
+      [(HasType e t)
+       (HasType (recur e) t)]
+      [(Void) (Void)])))
+
 ;; remove-complex-opera* : R1 -> R1
 (define (remove-complex-opera* p)
     (match p
