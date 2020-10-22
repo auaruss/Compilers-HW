@@ -47,9 +47,11 @@
 (define r3-passes
   `(
      ("shrink" ,shrink ,interp-R3)
-     #;("uniquify" ,uniquify ,interp-R3)
-     #;("expose allocation" ,expose-allocation ,interp-R3)
-     #;("remove complex opera*" ,remove-complex-opera* ,interp-R3)
+     ("uniquify" ,uniquify ,interp-R3)
+     #;("expose allocation" ,expose-allocation ,(let ([interp (new interp-R3-class)])
+                                                     (send interp interp-scheme '())))
+     #;("remove complex opera*" ,remove-complex-opera* ,(let ([interp (new interp-R3-class)])
+                                                             (send interp interp-scheme '())))
      #;("explicate control" ,explicate-control ,interp-C2)
      #;("instruction selection" ,select-instructions ,R3-interp-x86)
      #;("uncover live" ,uncover-live ,R3-interp-x86)

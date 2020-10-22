@@ -312,7 +312,9 @@
         [(Prim op es)
          (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]
 	[(If e1 e2 e3)
-	 (If ((uniquify-exp symtab) e1) ((uniquify-exp symtab) e2) ((uniquify-exp symtab) e3) )]))))
+	 (If ((uniquify-exp symtab) e1) ((uniquify-exp symtab) e2) ((uniquify-exp symtab) e3) )]
+	[(HasType e t)
+	 (HasType ((uniquify-exp symtab) e) t)]))))
 
 
 (define init-symbol-table
@@ -371,6 +373,9 @@
 	    [(list e1 e2 e3)
 	     (values (Var tmp)
              (append ss `((,tmp . ,(If e1 e2 e3)))))])]
+    [(HasType e t)
+     (define-values (new-e e-ss) (rco-atom e))
+     (values (HasType new-e t) e-ss)]
     ))
 
 (define (make-lets^ bs e)
@@ -392,84 +397,15 @@
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (make-lets^ (append* sss) (Prim op new-es))]
     [(If e1 e2 e3)
-     ;;(define-values (expression symbols) (rco-atom e))
-     ;;(make-lets^ (append* symbols) expression)]
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
      (match new-es
 	    [(list e1 e2 e3)
 	     (make-lets^ (append* sss) (If e1 e2 e3))])]
+    [(HasType e t)
+     (HasType (rco-exp e) t)]
     ))
 
-
-#|(define map-values
-    (λ (f ls)
-      (cond
-        [(empty? ls)
-         (values '() '())]
-        [(cons? ls) (define-values (v1 v2) (f (car ls)))
-                    (define-values (ls1 ls2) (map-values f (cdr ls)))
-                    (values (cons v1 ls1) (cons v2 ls2))])))
-
-(define rco-atom
-  (λ (e)
-    (match e
-      [(Var x) (values e '())]
-      [(Int n) (values e '())]
-      [(Bool b) (values e '())]
-      [(Let x e body)
-       (let ([v (gensym 'tmp)])
-                 (values
-                  (Var v)
-                  (list (cons v (Let x (rco-exp e) (rco-exp body))))))] ;; rco-atom on body, no gensym
-      [(Prim op es)
-       (define-values (exps syms)
-         (map-values
-          (λ (e)
-            (cond [(or (Var? e) (Int? e))
-                   (rco-atom e)]
-                  [else (let ([v (gensym 'tmp)])
-                          (define-values (_1 _2) (rco-atom e))
-                          (values (Var v)
-                                  (cons (cons v _1) _2)))]))
-          es))
-       (let ([v (gensym 'tmp)])
-         (values (Var v)
-                 (cons (cons v (Prim op exps)) (append* syms))))]
-      [(If e1 e2 e3)
-       (define-values (new-e1 s1) (rco-atom e1))
-       (define-values (new-e2 s2) (rco-atom e2))
-       (define-values (new-e3 s3) (rco-atom e3))
-       (define ss (append* (list s1 s2 s3)))
-       (define tmp (gensym 'tmp))
-       (values (Var tmp) (append ss `((,tmp . ,(If new-e1 new-e2 new-e3)))))
-       ])))
-
-(define (make-lets bs e)
-  (match bs
-    [`() e]
-    [`((,x . ,e^) . ,bs^)
-     (Let x e^ (make-lets bs^ e))]))
-
-(define rco-exp
-  (λ (e)
-    (match e
-      [(Var x) (Var x)]
-      [(Int n) (Int n)]
-      [(Bool b) (Bool b)]
-      [(Let x e body) (Let x (rco-exp e) (rco-exp body))]
-      [(Prim op es)
-       (define-values (exps symbols) (map-values rco-atom es))
-       (foldl
-        (λ (elem acc)
-          (if (empty? elem) acc (Let (car elem) (cdr elem) acc)))
-        (Prim op exps)
-        (append* (reverse symbols)))]
-      [(If e1 e2 e3)
-       (define-values (expression symbols) (rco-atom e))
-       (make-lets (append* symbols) expression)]
-      )))
-|#
 
 (define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 
