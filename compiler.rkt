@@ -564,9 +564,27 @@
 
 (define asdf (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x))))
 
-;; todo: more testing!
 
-;; note: explicate-control passes all tests in run-tests.rkt
+
+;;uncover-locals-helper : C2 list of blocks -> association list of locals and their types
+(define (uncover-locals-tail e)
+  (match e
+   [(Assign (Var v) (HasType e t))
+    (cons v t)]
+   [(Seq s t)
+    (cons (uncover-locals-tail s) (uncover-locals-tail t))]
+   [_ '()])
+  )
+
+(define (uncover-locals-helper es)
+  (append* (for/list ([l es])
+		     (uncover-locals-tail (cdr l)))))
+
+;; uncover-locals : C2 -> C2
+(define (uncover-locals p)
+  (match p
+    [(Program info (CFG es))
+     (Program (dict-set info 'locals (uncover-locals-helper es)) (CFG es))]))
 
 ; atm? : c0exp -> bool
 
