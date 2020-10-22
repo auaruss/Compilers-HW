@@ -377,7 +377,7 @@
                        (GlobalValue fromspace_end))
                     (void)
                     (collect bytes))])
-         (let ([v (allocate len type)])
+         (let ([v (allocate (length exps) type)])
            (vecs v)))]
       [(HasType e t)
        (HasType (recur e) t)]
