@@ -9,7 +9,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'concrete-syntax)
+(AST-output-syntax 'abstract-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -71,6 +71,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HW3 Passes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; example program from lecture:
+#;(let ([v (vector 42)])
+    (let ([w (vector v)])
+      (let ([v^ (vector-ref w 0)])
+        (vector-ref v^ 0))))
+
+(define hw3ex (Let 'v (Prim 'vector (list (Int 42)))
+                   (Let 'w (Prim 'vector (list (Var 'v)))
+                        (Let 'v^ (Prim 'vector-ref (list (Var 'w) (Int 0)))
+                             (Prim 'vector-ref (list (Var 'v^) (Int 0)))))))
+
+(define hw3prog (Program '() hw3ex))
+
 
 ;;Type-Check Pass: R2 -> R2
 
@@ -656,6 +670,16 @@
   (match p
     [(Program info (CFG es))
      (Program (dict-set info 'locals (uncover-locals-helper es)) (CFG es))]))
+
+;; new select-instructions for R3
+
+#;(define sofar (uncover-locals
+               (explicate-control
+                (remove-complex-opera*
+                 (expose-allocation
+                  (uniquify
+                   (shrink
+                    (type-check-R3 hw3prog))))))))
 
 ; atm? : c0exp -> bool
 
