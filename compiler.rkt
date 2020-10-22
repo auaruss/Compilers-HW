@@ -376,8 +376,8 @@
        (let ([_ (if (< (+ (GlobalValue 'free_ptr) bytes)
                        (GlobalValue 'fromspace_end))
                     (void)
-                    (collect bytes))])
-         (let ([v (allocate (length exps) type)])
+                    (Collect bytes))])
+         (let ([v (Allocate (length exps) type)])
            (vecs v)
            (HasType v type)))]
       [(HasType e t)
