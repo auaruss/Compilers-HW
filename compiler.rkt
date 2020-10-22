@@ -355,6 +355,8 @@
 
 ;;(interp-R2 (uniquify (shrink ((type-check-R2 '()) r2p8))))
 
+(define uptoexpose (uniquify (shrink (type-check-R3 hw3prog))))
+
 
 (define (expose-allocation p)
   (match p
@@ -705,12 +707,32 @@
 ; sel-ins-stmt : C0stmt -> pseudo-x86
 ; takes in a c0 statement and converts to pseudo-x86
 
+;; do i need to worry about hastypes?????
+
 (define (sel-ins-stmt c0stmt)
   (match c0stmt
+    [(Collect n) (list (Instr 'movq (list (Reg 'r15) (Reg 'rdi)))
+                       (Instr 'movq (list (Imm n) (Reg 'rsi))) ;; seems right
+                       (Callq 'collect))]
     [(Assign v e)
      (if (atm? e)
          (list (Instr 'movq (list (sel-ins-atm e) v)))
          (match e
+           [(Allocate len T)
+            (let ([tag 4]) ;; need to actually calculate tag using bitwise stuff
+              (list (Instr 'movq (list (Global 'free_ptr) v))
+                    (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
+                    (Instr 'movq (list v (Reg 'r11)))
+                    (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))] ;; deref r11 at 0 always?
+           [(Prim 'vector-ref (list atm (Int n)))
+            (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) ;; vec is atm?
+                  (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]
+           [(Prim 'vector-set! (list atm1 (Int n) atm2))
+            (list (Instr 'movq (list (sel-ins-atm atm1) (Reg 'r11)))
+                  (Instr 'movq (list (sel-ins-atm atm2) (Deref 'r11 (* 8 (add1 n)))))
+                  (Instr 'movq (list (Imm 0) v)))]
+           [(GlobalValue v) (list (Global v))] ;; ?
+           [(Void) (list (Imm 0))]
            [(Prim 'read '())
             (list (Callq 'read_int)
                   (Instr 'movq (list (Reg 'rax) v)))]
