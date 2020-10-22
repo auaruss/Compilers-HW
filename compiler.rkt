@@ -373,9 +373,25 @@
 	    [(list e1 e2 e3)
 	     (values (Var tmp)
              (append ss `((,tmp . ,(If e1 e2 e3)))))])]
+    [(Collect n) 
+     (define tmp (gensym 'tmp))
+     (values (Var tmp)
+             `((,tmp . ,(Collect n))))]
+    [(GlobalValue name) 
+     (define tmp (gensym 'tmp))
+     (values (Var tmp)
+             `((,tmp . ,(GlobalValue name))))]
+    [(Allocate n t) 
+     (define tmp (gensym 'tmp))
+     (values (Var tmp)
+             `((,tmp . ,(Allocate n t))))]
     [(HasType e t)
      (define-values (new-e e-ss) (rco-atom e))
-     (values (HasType new-e t) e-ss)]
+     (match new-e
+      [(Var v) 
+       (values (HasType new-e t) 
+	       (dict-set e-ss v (HasType (dict-ref e-ss v) t)))]
+      [else (values (HasType new-e t) e-ss)])]
     ))
 
 (define (make-lets^ bs e)
@@ -402,6 +418,18 @@
      (match new-es
 	    [(list e1 e2 e3)
 	     (make-lets^ (append* sss) (If e1 e2 e3))])]
+    [(Collect n)
+     (define-values (new-e ss)
+       (rco-atom (Collect n)))
+     (make-lets^ ss new-e)]
+    [(GlobalValue name)
+     (define-values (new-e ss)
+       (rco-atom (GlobalValue name)))
+     (make-lets^ ss new-e)]
+    [(Allocate n t)
+     (define-values (new-e ss)
+       (rco-atom (Allocate n t)))
+     (make-lets^ ss new-e)]
     [(HasType e t)
      (HasType (rco-exp e) t)]
     ))
