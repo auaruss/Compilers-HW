@@ -570,10 +570,10 @@
 (define (uncover-locals-tail e)
   (match e
    [(Assign (Var v) (HasType e t))
-    (cons v t)]
+    (list (cons v t))]
    [(Seq s t)
-    (cons (uncover-locals-tail s) (uncover-locals-tail t))]
-   [_ '()])
+    (append (uncover-locals-tail s) (uncover-locals-tail t))]
+   [_ (list)])
   )
 
 (define (uncover-locals-helper es)
