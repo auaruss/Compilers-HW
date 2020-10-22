@@ -373,12 +373,13 @@
                                       (set! i (add1 i))
                                       )
                                     es)))
-       (let ([_ (if (< (+ (GlobalValue free_ptr) bytes)
-                       (GlobalValue fromspace_end))
+       (let ([_ (if (< (+ (GlobalValue 'free_ptr) bytes)
+                       (GlobalValue 'fromspace_end))
                     (void)
                     (collect bytes))])
          (let ([v (allocate (length exps) type)])
-           (vecs v)))]
+           (vecs v)
+           (HasType v type)))]
       [(HasType e t)
        (HasType (recur e) t)]
       [(Void) (Void)])))
