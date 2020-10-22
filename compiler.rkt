@@ -90,17 +90,27 @@
     ['>= #t]
     [else #f]))
 
-(define (type-check-exp env)
+(define (list-swap-element ts i t2 count)
+  (cond
+    [(null? ts) '()]
+    [(eq? i count) (cons t2 (list-swap-element (cdr ts) i t2 (add1 count)))]
+    [else (cons (car ts) (list-swap-element (cdr ts) i t2 (add1 count)))]
+    ))
+
+(define type-check-env (make-hash))
+
+(define (type-check-exp)
   (lambda (e)
-    (define recur (type-check-exp env))
+    (define recur (type-check-exp))
     (match e
-      [(Var x) (let ([t (dict-ref env x)]) 
+      [(Var x) (let ([t (dict-ref type-check-env x)]) 
 		 (values (HasType e t) t))]
       [(Int n) (values (HasType e 'Integer) 'Integer)]
       [(Bool b) (values (HasType e 'Boolean) 'Boolean)]
       [(Let x e body)
-        (define-values (e^ Te) ((type-check-exp env) e))
-        (define-values (b^ Tb) ((type-check-exp (dict-set env x Te)) body))
+        (define-values (e^ Te) ((type-check-exp) e))
+        (dict-set! type-check-env x Te)
+        (define-values (b^ Tb) ((type-check-exp) body))
         (values 
 	  (HasType (Let x e^ b^) Tb) Tb)]
       [(Void) (values (HasType (Void) 'Void) 'Void)]
@@ -121,16 +131,32 @@
                       t)
            t))]
          [else (error "expected a vector in vector-ref, not" t)])]
-      [(Prim 'vector-set (list e1 (Int i) e2))
-        (define-values (e1^ t1) (recur e1))
+      [(Prim 'vector-set! (list e1 (Int i) e2))
+        (if (and (Var? e1) (Var? e2)) 
+           (unless (not (eq? (Var-name e1) (Var-name e2)))
+             (error 'type-check-exp "vector-set! exp1 and exp2 must no be same, both are ~a" e1))
+	   (Var? e1) ;;null operation, does nothing
+           )
+	 (define-values (e1^ t1) (recur e1))
         (define-values (e2^ t2) (recur e2))
-        (match t1
-         [`(Vector ,ts ...)
+        (match e1^
+         [(HasType (Var s) `(Vector ,ts ...))
            (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
              (error 'type-check-exp "invalid index ~a" i))
-           (values
-             (HasType (Prim 'vector-set
-                            (list e1^ (HasType (Int i) 'Integer) e2^))
+           (define new-ts (list-swap-element ts i t2 0))
+	   (dict-set! type-check-env s `(Vector ,@new-ts))
+	   (values
+             (HasType (Prim 'vector-set!
+                            (list (HasType (Var s) `(Vector ,@new-ts)) (HasType (Int i) 'Integer) e2^))
+                      'Void)
+           'Void)]
+         [(HasType e* `(Vector ,ts ...))
+           (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
+             (error 'type-check-exp "invalid index ~a" i))
+           (define new-ts (list-swap-element ts i t2 0))
+	   (values
+             (HasType (Prim 'vector-set!
+                            (list (HasType e* `(Vector ,@new-ts)) (HasType (Int i) 'Integer) e2^))
                       'Void)
            'Void)]
          [else (error "expected a vector in vector-set, not" t1)])]
@@ -138,51 +164,51 @@
       [(Prim op (list e1)) 
        (match op
 	 ['-   
-          (define-values (e1^ Te1) ((type-check-exp env) e1))
+          (define-values (e1^ Te1) ((type-check-exp) e1))
 	  (unless (equal? Te1 'Integer)
             (error "argument to an arithmetic operator must be an integer, not" Te1))
 	  (values (HasType (Prim op (list e1^)) 'Integer) 'Integer)]
 	 ['not 
-          (define-values (e1^ Te1) ((type-check-exp env) e1))
+          (define-values (e1^ Te1) ((type-check-exp) e1))
           (unless (equal? Te1 'Boolean)
             (error "argument to a boolean operator must be a boolean, not" Te1))
 	  (values (HasType (Prim op (list e1^)) 'Boolean) 'Boolean)])]
       [(Prim op (list e1 e2))
        (match op
          ['eq? 
-          (define-values (e1^ Te1) ((type-check-exp env) e1))
-          (define-values (e2^ Te2) ((type-check-exp env) e2))
+          (define-values (e1^ Te1) ((type-check-exp) e1))
+          (define-values (e2^ Te2) ((type-check-exp) e2))
           (unless (equal? Te1 Te2)
             (error "arguments to eq? must be the same type, not" Te1 'and Te2))
 	  (values (HasType (Prim op (list e1^ e2^)) 'Boolean) 'Boolean)]
          [`,y #:when (boolean-operator? op)
-          (define-values (e1^ Te1) ((type-check-exp env) e1))
-          (define-values (e2^ Te2) ((type-check-exp env) e2))
+          (define-values (e1^ Te1) ((type-check-exp) e1))
+          (define-values (e2^ Te2) ((type-check-exp) e2))
           (unless (equal? Te1 'Boolean)
             (error "argument to a boolean operator must be a boolean, not" Te1))
           (unless (equal? Te2 'Boolean)
             (error "argument to a boolean operator must be a boolean, not" Te2))
 	  (values (HasType (Prim op (list e1^ e2^)) 'Boolean) 'Boolean)]
          [`,y #:when (comparison-operator? op)
-          (define-values (e1^ Te1) ((type-check-exp env) e1))
-          (define-values (e2^ Te2) ((type-check-exp env) e2))
+          (define-values (e1^ Te1) ((type-check-exp) e1))
+          (define-values (e2^ Te2) ((type-check-exp) e2))
           (unless (equal? Te1 'Integer)
             (error "argument to a comparison operator must be a integer, not" Te1))
           (unless (equal? Te2 'Integer)
             (error "argument to a copmarison operator must be an integer, not" Te2))
 	  (values (HasType (Prim op (list e1^ e2^)) 'Boolean) 'Boolean)]
 	 [else
-          (define-values (e1^ Te1) ((type-check-exp env) e1))
-          (define-values (e2^ Te2) ((type-check-exp env) e2))
+          (define-values (e1^ Te1) ((type-check-exp) e1))
+          (define-values (e2^ Te2) ((type-check-exp) e2))
           (unless (equal? Te1 'Integer)
             (error "argument to an arithmetic operator must be an integer, not" Te1))
           (unless (equal? Te2 'Integer)
             (error "argument to an arithmetic operator must be an integer, not" Te2))
           (values (HasType (Prim op (list e1^ e2^)) 'Integer) 'Integer)])] 
       [(If e1 e2 e3)
-          (define-values (e1^ Te1) ((type-check-exp env) e1))
-          (define-values (e2^ Te2) ((type-check-exp env) e2))
-          (define-values (e3^ Te3) ((type-check-exp env) e3))
+          (define-values (e1^ Te1) ((type-check-exp) e1))
+          (define-values (e2^ Te2) ((type-check-exp) e2))
+          (define-values (e3^ Te3) ((type-check-exp) e3))
           (unless (equal? Te1 'Boolean)
             (error "If condition must be a boolean, not" Te1))
           (unless (equal? Te2 Te3)
@@ -195,7 +221,7 @@
   (lambda (e)
     (match e
       [(Program info body)
-        (define-values (b^ Tb) ((type-check-exp '()) body))
+        (define-values (b^ Tb) ((type-check-exp) body))
 	  (unless (equal? Tb 'Integer)
             (error "result of the program must be an integer, not" Tb))
           (Program info b^)]
@@ -223,10 +249,10 @@
 		       (Let 'v1 (Prim 'vector (list (Int 0))) 
 			    (Let 'g1 (Prim 'vector (list (Int 1) (Int 2) (Int 3) (Int 4) (Int 5)))
 				 (Let 'dummy (If (Prim 'eq? (list (Prim 'read '()) (Int 0)))
-                                                 (Prim 'vector-set (list (Var 'v1) (Int 0) (Int 42)))
-                                                 (Prim 'vector-set (list (Var 'g1) (Int 0) (Int 42))))
+                                                 (Prim 'vector-set! (list (Var 'v1) (Int 0) (Int 42)))
+                                                 (Prim 'vector-set! (list (Var 'g1) (Int 0) (Int 42))))
 				      (Prim 'vector-ref (list (Var 'v1) (Int 0))))))))
-#;(type-check-R3 r3_15)
+;;(type-check-R3 r3_15)
 
 ;;Shrink Pass: R2 -> R2
 (define (shrink-exp e)
@@ -247,7 +273,7 @@
     [(HasType (Prim op (list e1)) type)
      (HasType (Prim op (list (shrink-exp e1))) type)]
     [(HasType (Prim op (list e1 e2)) type)
-     (HasType (Prim op (list (shrink-exp e1) (shrink-exp e2))) 'type)]
+     (HasType (Prim op (list (shrink-exp e1) (shrink-exp e2))) type)]
     [(HasType (If e1 e2 e3) type)
      (HasType (If (shrink-exp e1) (shrink-exp e2) (shrink-exp e3)) type)]
     [else e]

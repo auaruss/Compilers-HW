@@ -11,7 +11,7 @@
 (require "interp.rkt")
 (require "compiler.rkt")
 (AST-output-syntax 'abstract-syntax)
-;; (debug-level 1)
+(debug-level 0)
 ;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
@@ -46,7 +46,7 @@
 
 (define r3-passes
   `(
-     #;("shrink" ,shrink ,interp-R3)
+     ("shrink" ,shrink ,interp-R3)
      #;("uniquify" ,uniquify ,interp-R3)
      #;("expose allocation" ,expose-allocation ,interp-R3)
      #;("remove complex opera*" ,remove-complex-opera* ,interp-R3)
