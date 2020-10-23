@@ -381,21 +381,51 @@
       [(If e1 e2 e3)
        (If (recur e1) (recur e2) (recur e3))]
       [(HasType (Prim 'vector exps) type)
-       (define es (map recur exps))
        (define i 0)
        (define bytes (* 8 (add1 (length exps))))
-       (define vecs (λ (v) (for-each (λ (_)
-                                      (vector-set! v i _)
-                                      (set! i (add1 i))
-                                      )
-                                    es)))
-       (let ([_ (if (< (+ (GlobalValue 'free_ptr) bytes)
-                       (GlobalValue 'fromspace_end))
-                    (void)
-                    (Collect bytes))])
-         (let ([v (Allocate (length exps) type)])
-           (vecs v)
-           (HasType v type)))]
+       (foldr
+        (λ (elem acc)
+          (let ([x (string->symbol (string-append "x" (number->string i)))])
+            (set! i (add1 i))
+            (Let x (recur elem) acc)))
+        (begin
+          (set! i 0)
+          (HasType
+           (Let '_
+                (HasType
+                 (If (HasType (Prim '< (list
+                                        (HasType (Prim '+ (list (GlobalValue 'free_ptr) (Int bytes))) 'Integer)
+                                        (HasType (GlobalValue 'fromspace_end) 'Integer)) 'Boolean))
+                     (HasType (Void) 'Void)
+                     (HasType (Collect bytes) 'Void)) 'Void)
+                (HasType
+                 (Let 'v
+                      (HasType (Allocate (HasType (Int (length exps)) 'Integer) type) type)
+                      (HasType
+                       (foldr
+                        (λ (elem acc)
+                          (let* ([x (string->symbol (string-append "x" (number->string i)))]
+                                 [xtype (match type
+                                          [`(Vector ,ts ...)
+                                           (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
+                                             (error 'expose-allocation-exp "invalid index ~a" i))
+                                           (list-ref ts i)]
+                                          [else (error "expected a vector in vector-ref, not" type)])])
+                            (set! i (add1 i))
+                            (HasType
+                             (Let '_
+                                  (HasType (Prim
+                                            'vector-set
+                                            (list (HasType (Var 'v) type)
+                                                  (HasType (Int i) 'Integer)
+                                                  (HasType (Var x)
+                                                           xtype))) 'Void)
+                                  acc) type)))
+                        (begin
+                          (set! i 0)
+                          (HasType (Var 'v) type))
+                        (map recur exps)) type)) type)) type))
+        exps)]
       [(HasType e t)
        (HasType (recur e) t)]
       [(Void) (Void)])))
