@@ -510,10 +510,8 @@
      (values (Return (Bool b)) '())]
     [(Prim 'read '())
      (values (Return (Prim 'read '())) '())]
-    [(Prim op (list e))
-     (values (Return (Prim op (list e))) '())]
-    [(Prim op (list e1 e2))
-     (values (Return (Prim op (list e1 e2))) '())] 
+    [(Prim op ls)
+     (values (Return (Prim op ls)) '())]
     [(Var x)
      (values (Return (Var x)) '())]
     [(Let x e body) 
@@ -525,6 +523,9 @@
      (define-values (c1tail-else let-binds-else) (explicate-tail e3))  
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
      (values c1tail-new (append let-binds-then let-binds-else let-binds-new))
+     ]
+    [(HasType e t)
+     (explicate-tail e)
      ]
     ))
 
@@ -566,6 +567,12 @@
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
      (values c1tail-new (append let-binds-then let-binds-else let-binds-new))
      ]
+    [(HasType e t)
+     (define-values (c1tail let-binds) (explicate-assign e))
+     (match c1tail
+      [(Seq (Assign v e^) tail)
+       (Seq (Assign v (HasType e^ t)) tail)])
+     ]
     ))
 
 ;; explicate-pred : R2_exp x C1_tail x C1_tail -> C1_tail x var list
@@ -576,8 +583,6 @@
     [(Var v)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     #;(add-vertex! globalCFG (cons label1 c1))
-     #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
@@ -589,8 +594,6 @@
     [(Prim op (list e))
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     #;(add-vertex! globalCFG (cons label1 c1))
-     #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
@@ -602,8 +605,6 @@
     [(Prim op (list e1 e2))
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     #;(add-vertex! globalCFG (cons label1 c1))
-     #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
@@ -615,8 +616,6 @@
     [(If e1 e2 e3)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
-     #;(add-vertex! globalCFG (cons label1 c1))
-     #;(add-vertex! globalCFG (cons label2 c2))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
@@ -626,8 +625,9 @@
      (define-values (c1tail-then let-binds-then) (explicate-pred e2 (Goto label1) (Goto label2)))
      (define-values (c1tail-else let-binds-else) (explicate-pred e3 (Goto label1) (Goto label2)))
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
-     (values c1tail-new (append let-binds-then let-binds-else let-binds-new)) 
-     ]
+     (values c1tail-new (append let-binds-then let-binds-else let-binds-new)) ]
+    [(HasType e t)
+     (explicate-pred e)]
      ))
 
 ;; explicate-control : R1 -> C0
