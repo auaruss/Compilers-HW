@@ -389,47 +389,46 @@
 	        [q (Let x (recur elem) acc)])
             (set! i (add1 i))
             q))
-        (let ([q (begin
-          (set! i 0)
-          (HasType
-           (Let '_
-                (HasType
-                 (If (HasType (Prim '< (list
-                                        (HasType (Prim '+ (list (GlobalValue 'free_ptr) (Int bytes))) 'Integer)
-                                        (HasType (GlobalValue 'fromspace_end) 'Integer))) 'Boolean)
-                     (HasType (Void) 'Void)
-                     (HasType (Collect bytes) 'Void)) 'Void)
-                (HasType
-                 (Let 'v
-                      (HasType (Allocate (length exps) type) type)
-                      (HasType
-                       (foldr
-                        (λ (elem acc)
-                          (let* ([x (string->symbol (string-append "x" (number->string i)))]
-                                 [xtype (match type
-                                          [`(Vector ,ts ...)
-                                           (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
-                                             (error 'expose-allocation-exp "invalid index ~a" i))
-                                           (list-ref ts i)]
-                                          [else (error "expected a vector in vector-ref, not" type)])]
-				 [q (HasType
-                                      (Let '_
-                                        (HasType (Prim
-                                            'vector-set!
-                                            (list (HasType (Var 'v) type)
-                                                  (HasType (Int i) 'Integer)
-                                                  (HasType (Var x)
-                                                           xtype))) 'Void)
-                                         acc) type)])
-                            (set! i (add1 i))
-			    q
-                            ))
-                        (begin
-                          (set! i 0)
-                          (HasType (Var 'v) type))
-                        exps #;(map recur exps)) type)) type)) type))])
-			q)
-        exps)]
+        (let ([q (HasType
+                  (Let '_
+                       (HasType
+                        (If (HasType (Prim '< (list
+                                               (HasType (Prim '+ (list (GlobalValue 'free_ptr) (Int bytes))) 'Integer)
+                                               (HasType (GlobalValue 'fromspace_end) 'Integer))) 'Boolean)
+                            (HasType (Void) 'Void)
+                            (HasType (Collect bytes) 'Void)) 'Void)
+                       (HasType
+                        (Let 'v
+                             (HasType (Allocate (length exps) type) type)
+                             (HasType
+                              (foldr
+                               (λ (elem acc)
+                                 (let* ([x (string->symbol (string-append "x" (number->string i)))]
+                                        [xtype (match type
+                                                 [`(Vector ,ts ...)
+                                                  (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
+                                                    (error 'expose-allocation-exp "invalid index ~a" i))
+                                                  (list-ref ts i)]
+                                                 [else (error "expected a vector in vector-ref, not" type)])]
+                                        [q (HasType
+                                            (Let '_
+                                                 (HasType (Prim
+                                                           'vector-set!
+                                                           (list (HasType (Var 'v) type)
+                                                                 (HasType (Int i) 'Integer)
+                                                                 (HasType (Var x)
+                                                                          xtype))) 'Void)
+                                                 acc) type)])
+                                   (set! i (add1 i))
+                                   q
+                                   ))
+                               (begin
+                                 (set! i 0)
+                                 (HasType (Var 'v) type))
+                               exps #;(map recur exps)) type)) type)) type)])
+          (begin (set! i 0)
+                 q))
+          exps)]
       [(HasType e t)
        (HasType (recur e) t)]
       [(Void) (Void)])))
