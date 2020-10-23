@@ -366,16 +366,16 @@
 (define (expose-allocation-exp env)
   (λ (e)
     (define recur (expose-allocation-exp env))
-    (match (e)
+    (match e
       [(Var x) (Var x)]
       [(Int n) (Int n)]
       [(Bool b) (Bool b)]
       [(Let x rhs body)
-       (Let (recur x) (recur rhs) body)]
-      [(Prim 'vector-ref (list exp int))
-       (Prim 'vector-ref (list (recur exp) int))]
-      [(Prim 'vector-set (list exp1 int exp2))
-       (Prim 'vector-set (list (recur exp1) int (recur exp2)))]
+       (Let x (recur rhs) (recur body))]
+      [(Prim 'vector-ref (list e^ int))
+       (Prim 'vector-ref (list (recur e^) int))]
+      [(Prim 'vector-set! (list exp1 int exp2))
+       (Prim 'vector-set! (list (recur exp1) int (recur exp2)))]
       [(Prim op es)
        (Prim op (map recur es))]
       [(If e1 e2 e3)
@@ -385,22 +385,23 @@
        (define bytes (* 8 (add1 (length exps))))
        (foldr
         (λ (elem acc)
-          (let ([x (string->symbol (string-append "x" (number->string i)))])
+          (let* ([x (string->symbol (string-append "x" (number->string i)))]
+	        [q (Let x (recur elem) acc)])
             (set! i (add1 i))
-            (Let x (recur elem) acc)))
-        (begin
+            q))
+        (let ([q (begin
           (set! i 0)
           (HasType
            (Let '_
                 (HasType
                  (If (HasType (Prim '< (list
                                         (HasType (Prim '+ (list (GlobalValue 'free_ptr) (Int bytes))) 'Integer)
-                                        (HasType (GlobalValue 'fromspace_end) 'Integer)) 'Boolean))
+                                        (HasType (GlobalValue 'fromspace_end) 'Integer))) 'Boolean)
                      (HasType (Void) 'Void)
                      (HasType (Collect bytes) 'Void)) 'Void)
                 (HasType
                  (Let 'v
-                      (HasType (Allocate (HasType (Int (length exps)) 'Integer) type) type)
+                      (HasType (Allocate (length exps) type) type)
                       (HasType
                        (foldr
                         (λ (elem acc)
@@ -410,21 +411,24 @@
                                            (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
                                              (error 'expose-allocation-exp "invalid index ~a" i))
                                            (list-ref ts i)]
-                                          [else (error "expected a vector in vector-ref, not" type)])])
-                            (set! i (add1 i))
-                            (HasType
-                             (Let '_
-                                  (HasType (Prim
-                                            'vector-set
+                                          [else (error "expected a vector in vector-ref, not" type)])]
+				 [q (HasType
+                                      (Let '_
+                                        (HasType (Prim
+                                            'vector-set!
                                             (list (HasType (Var 'v) type)
                                                   (HasType (Int i) 'Integer)
                                                   (HasType (Var x)
                                                            xtype))) 'Void)
-                                  acc) type)))
+                                         acc) type)])
+                            (set! i (add1 i))
+			    q
+                            ))
                         (begin
                           (set! i 0)
                           (HasType (Var 'v) type))
-                        (map recur exps)) type)) type)) type))
+                        exps #;(map recur exps)) type)) type)) type))])
+			q)
         exps)]
       [(HasType e t)
        (HasType (recur e) t)]
