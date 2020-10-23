@@ -687,6 +687,7 @@
 
 (define (atm? c0exp)
     (match c0exp
+      [(HasType exp type) (atm? exp)]
       [(Int n) #t]
       [(Var x) #t]
       [(Bool b) #t]
@@ -697,6 +698,7 @@
 
 (define (sel-ins-atm c0a)
   (match c0a
+    [(HasType atm type) (sel-ins-atm atm)]
     [(Int n) (Imm n)]
     [(Var x) (Var x)]
     [(Bool b) 
@@ -711,6 +713,7 @@
 
 (define (sel-ins-stmt c0stmt)
   (match c0stmt
+    [(HasType stmt type) (sel-ins-stmt stmt)]
     [(Collect n) (list (Instr 'movq (list (Reg 'r15) (Reg 'rdi)))
                        (Instr 'movq (list (Imm n) (Reg 'rsi))) ;; seems right
                        (Callq 'collect))]
@@ -777,6 +780,7 @@
 
 (define (sel-ins-tail c0t)
   (match c0t
+    [(HasType tail type) (sel-ins-tail tail)]
     [(Return e)
      (append (sel-ins-stmt (Assign (Reg 'rax) e))
              (list (Jmp 'conclusion)))]
