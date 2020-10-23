@@ -11,7 +11,7 @@
 (require "interp.rkt")
 (require "compiler.rkt")
 (AST-output-syntax 'abstract-syntax)
-(debug-level 1)
+(debug-level 0)
 ;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
@@ -50,9 +50,10 @@
      ("uniquify" ,uniquify ,interp-R3)
      ("expose allocation" ,expose-allocation ,(let ([interp (new interp-R3-class)])
                                                      (send interp interp-scheme '())))
-     #;("remove complex opera*" ,remove-complex-opera* ,(let ([interp (new interp-R3-class)])
+     ("remove complex opera*" ,remove-complex-opera* ,(let ([interp (new interp-R3-class)])
                                                              (send interp interp-scheme '())))
-     #;("explicate control" ,explicate-control ,interp-C2)
+     ("explicate control" ,explicate-control ,interp-C2)
+     ("uncover locals" ,uncover-locals ,interp-C2)
      #;("instruction selection" ,select-instructions ,R3-interp-x86)
      #;("uncover live" ,uncover-live ,R3-interp-x86)
      #;("build interference" ,build-interference ,R3-interp-x86)
