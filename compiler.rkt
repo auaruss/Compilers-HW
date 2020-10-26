@@ -304,8 +304,6 @@
 (define r2p7 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '> (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
 (define r2p8 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '<= (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
 
-;;(interp-R2 (shrink ((type-check-R2 '()) r2p8)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HW1 Passes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -710,6 +708,8 @@
   (match p
     [(Program info (CFG es))
      (Program (dict-set info 'locals (uncover-locals-helper es)) (CFG es))]))
+
+;;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 r3_15)))))))
 
 ;; new select-instructions for R3
 
