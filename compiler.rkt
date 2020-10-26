@@ -769,15 +769,15 @@
                     (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
                     (Instr 'movq (list v (Reg 'r11)))
                     (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))] ;; deref r11 at 0 always?
-           [(Prim 'vector-ref (list atm (Int n)))
+           [(Prim 'vector-ref (list atm (HasType (Int n) t)))
             (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) ;; vec is atm?
                   (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]
-           [(Prim 'vector-set! (list atm1 (Int n) atm2))
+           [(Prim 'vector-set! (list atm1 (HasType (Int n) t) atm2))
             (list (Instr 'movq (list (sel-ins-atm atm1) (Reg 'r11)))
                   (Instr 'movq (list (sel-ins-atm atm2) (Deref 'r11 (* 8 (add1 n)))))
                   (Instr 'movq (list (Imm 0) v)))]
-           [(GlobalValue v) (list (Global v))] ;; ?
-           [(Void) (list (Imm 0))]
+           [(GlobalValue name) (list (Instr 'movq (list (Global name) v)))] ;; ?
+           [(Void) (list (Instr 'movq (list (Imm 0) v)))]
            [(Prim 'read '())
             (list (Callq 'read_int)
                   (Instr 'movq (list (Reg 'rax) v)))]
@@ -941,9 +941,7 @@
     [(Program info (CFG es)) 
      (for ([ls es]) (add-global-CFG-edges (car ls) (match (cdr ls)
 							       [(Block b-info instr-ls) instr-ls])))
-     (Program info (CFG (sort-blocks (tsort (transpose globalCFG)) es) #;(for/list ([ls es]) (cons (car ls) (match (cdr ls)
-							     [(Block b-info instr-ls) 
-							      (Block (uncover-live-helper (reverse instr-ls) (list->set '())) instr-ls)])))))]
+     (Program info (CFG (sort-blocks (tsort (transpose globalCFG)) es)))]
     ))
 
 
