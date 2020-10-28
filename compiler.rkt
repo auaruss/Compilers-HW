@@ -974,6 +974,7 @@
     [(Var x) (set x)]
     [(Reg r) (set r)]
     [(Deref r i) (set r)]
+    [(Global v) (set v)]
     [(Imm n) (set)]
     [else (error "free vars, unhandled" arg)]))
 
