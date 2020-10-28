@@ -1001,7 +1001,7 @@
        ast]
       [(Callq f)
        (define vector-vars
-               (filter-map (λ (x) (and (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
+               (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
        (if (eqv? f 'collect)
            (for ([v live-after])
              (for ([u caller-save-for-alloc^])
