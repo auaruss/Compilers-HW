@@ -967,6 +967,7 @@
 
 
 (define caller-save-for-alloc^ '(al rax rdx rcx rsi rdi r8 r9 r10 r11))
+(define callee-save-for-alloc^ '(rsp rbp rbx r12 r13 r14 r15))
 
 (define (free-vars^ arg)
   (match arg
@@ -986,7 +987,7 @@
     [(Callq f) (set)]
     [else (error "write-vars unmatched" instr)]))
 
-(define (build-interference-instr^ live-after g)
+(define (build-interference-instr^ live-after g locals)
   (λ (ast)
     (match ast
       [(or (Instr 'movq (list s d))
@@ -998,11 +999,23 @@
                  [else (add-edge! g d v)])))
        ast]
       [(Callq f)
-       (for ([v live-after])
-         (for ([u caller-save-for-alloc^])
-           (if (equal? v u)
-               (verbose "skip self edge on" v)
-               (add-edge! g u v))))
+       (define vector-vars
+               (filter-map (λ (x) (and (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
+       (if (eqv? f 'collect)
+           (for ([v live-after])
+             (for ([u caller-save-for-alloc^])
+               (if (equal? v u)
+                   (verbose "skip self edge on" v)
+                   (add-edge! g u v)))
+             (for ([u callee-save-for-alloc^])
+               (if (or (equal? v u) (not (member v vector-vars)))
+                   (verbose "skip self edge or non-vector on" v)
+                   (add-edge! g u v))))
+           (for ([v live-after])
+             (for ([u caller-save-for-alloc^])
+               (if (equal? v u)
+                   (verbose "skip self edge on" v)
+                   (add-edge! g u v)))))
        ast]
       [else
        (for ([v live-after])
@@ -1014,13 +1027,13 @@
                        
                   
 
-(define (build-interference-block^ ast g)
+(define (build-interference-block^ ast g locals)
   (match ast
     [(Block info ss)
      (let* ([lives info]
             [live-afters (cdr lives)]
             [new-ss (for/list ([inst ss] [live-after live-afters])
-                      ((build-interference-instr^ live-after g) inst))]
+                      ((build-interference-instr^ live-after g locals) inst))]
             [new-info '()])
        (Block info ss))]))
 
@@ -1031,7 +1044,7 @@
             [g (undirected-graph '())])
        (for ([v locals]) (add-vertex! g v))
        (let* ([new-cfg (for/list ([(label block) (in-dict cfg)])
-                         (cons label (build-interference-block^ block g)))]
+                         (cons label (build-interference-block^ block g locals)))]
               [new-info (dict-set info 'conflicts g)])
          (Program new-info (CFG new-cfg))))]))
 
