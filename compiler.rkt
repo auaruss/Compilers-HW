@@ -78,12 +78,12 @@
       (let ([v^ (vector-ref w 0)])
         (vector-ref v^ 0))))
 
-(define hw3ex (Let 'v (Prim 'vector (list (Int 42)))
+(define hw4ex (Let 'v (Prim 'vector (list (Int 42)))
                    (Let 'w (Prim 'vector (list (Var 'v)))
                         (Let 'v^ (Prim 'vector-ref (list (Var 'w) (Int 0)))
                              (Prim 'vector-ref (list (Var 'v^) (Int 0)))))))
 
-(define hw3prog (Program '() hw3ex))
+(define hw4prog (Program '() hw4ex))
 
 
 ;;Type-Check Pass: R2 -> R2
@@ -340,7 +340,7 @@
      (Program info ((uniquify-exp (init-symbol-table)) e))]
     ))
 
-(define uptoexpose (uniquify (shrink (type-check-R3 hw3prog))))
+(define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
 
 
 (define (expose-allocation p)
@@ -683,13 +683,13 @@
 
 ;; new select-instructions for R3
 
-#;(define sofar (uncover-locals
+(define sofar (uncover-locals
                (explicate-control
                 (remove-complex-opera*
                  (expose-allocation
                   (uniquify
                    (shrink
-                    (type-check-R3 hw3prog))))))))
+                    (type-check-R3 hw4prog))))))))
 
 ; atm? : c0exp -> bool
 
@@ -717,10 +717,36 @@
 ; sel-ins-stmt : C0stmt -> pseudo-x86
 ; takes in a c0 statement and converts to pseudo-x86
 
-;; do i need to worry about hastypes?????
+;; list->number : BinaryList -> Number
+(define (list->number ls)
+   (if (empty? ls)
+       0
+       (if (equal? 1 (car ls))
+           (+ (list->number (cdr ls)) (expt 2 (length (cdr ls))))
+           (list->number (cdr ls)))))
 
-(define (calculate-tag T)
-  4)
+;; type->binary : Type -> BinaryList
+(define (type->binary tp)
+    (if (empty? tp)
+        '()
+        (if (and (list? (car tp)) (equal? (car (car tp)) 'Vector))
+            (cons 1 (type->binary (cdr tp)))
+            (cons 0 (type->binary (cdr tp))))))
+
+
+;; calculate-tag : Number Type -> Number
+;; calculates tag using following algorithm:
+;; (1) converts given type into a binary number
+;;      - this is done by placing a 1 at the spots that the tuple has a vector, 0 otherwise
+;;      - e.g., '(Vector Int Boolean (Vector Int) Int (Vector)) => '(0 0 1 0 1)
+;; (2) calculates the length of the type
+;; (3) bitwise-or with length left-shifted 1 place and 1 (forwarding bit set)
+;; (4) left-shift the type number by 7, bitwise-or with result of (3)
+(define (calculate-tag len T)
+  (let* ([type-num (arithmetic-shift (list->number (reverse (type->binary (cdr T)))) 7)]
+         [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
+         [res (bitwise-ior type-num type-len)])
+    res))
 
 (define (sel-ins-stmt c0stmt)
   (match c0stmt
@@ -734,7 +760,7 @@
          (match e
            [(HasType e^ t) (sel-ins-stmt (Assign v e^))]
            [(Allocate len T)
-            (let ([tag (calculate-tag T)]) ;; need to actually calculate tag using bitwise stuff
+            (let ([tag (calculate-tag len T)]) ;; need to actually calculate tag using bitwise stuff
               (list (Instr 'movq (list (Global 'free_ptr) v))
                     (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
                     (Instr 'movq (list v (Reg 'r11)))
