@@ -9,7 +9,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'abstract-syntax)
+(AST-output-syntax 'concrete-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -78,12 +78,12 @@
       (let ([v^ (vector-ref w 0)])
         (vector-ref v^ 0))))
 
-(define hw3ex (Let 'v (Prim 'vector (list (Int 42)))
+(define hw4ex (Let 'v (Prim 'vector (list (Int 42)))
                    (Let 'w (Prim 'vector (list (Var 'v)))
                         (Let 'v^ (Prim 'vector-ref (list (Var 'w) (Int 0)))
                              (Prim 'vector-ref (list (Var 'v^) (Int 0)))))))
 
-(define hw3prog (Program '() hw3ex))
+(define hw4prog (Program '() hw4ex))
 
 
 ;;Type-Check Pass: R2 -> R2
@@ -111,20 +111,18 @@
     [else (cons (car ts) (list-swap-element (cdr ts) i t2 (add1 count)))]
     ))
 
-(define type-check-env (make-hash))
 
-(define (type-check-exp)
+(define (type-check-exp env)
   (lambda (e)
-    (define recur (type-check-exp))
+    (define recur (type-check-exp env))
     (match e
-      [(Var x) (let ([t (dict-ref type-check-env x)]) 
+      [(Var x) (let ([t (dict-ref env x)]) 
 		 (values (HasType e t) t))]
       [(Int n) (values (HasType e 'Integer) 'Integer)]
       [(Bool b) (values (HasType e 'Boolean) 'Boolean)]
       [(Let x e body)
-        (define-values (e^ Te) ((type-check-exp) e))
-        (dict-set! type-check-env x Te)
-        (define-values (b^ Tb) ((type-check-exp) body))
+        (define-values (e^ Te) ((type-check-exp env) e))
+        (define-values (b^ Tb) ((type-check-exp (dict-set env x Te)) body))
         (values 
 	  (HasType (Let x e^ b^) Tb) Tb)]
       [(Void) (values (HasType (Void) 'Void) 'Void)]
@@ -151,26 +149,17 @@
              (error 'type-check-exp "vector-set! exp1 and exp2 must no be same, both are ~a" e1))
 	   (Var? e1) ;;null operation, does nothing
            )
-	 (define-values (e1^ t1) (recur e1))
+	(define-values (e1^ t1) (recur e1))
         (define-values (e2^ t2) (recur e2))
-        (match e1^
-         [(HasType (Var s) `(Vector ,ts ...))
-           (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
-             (error 'type-check-exp "invalid index ~a" i))
-           (define new-ts (list-swap-element ts i t2 0))
-	   (dict-set! type-check-env s `(Vector ,@new-ts))
-	   (values
-             (HasType (Prim 'vector-set!
-                            (list (HasType (Var s) `(Vector ,@new-ts)) (HasType (Int i) 'Integer) e2^))
-                      'Void)
-           'Void)]
+	(match e1^
          [(HasType e* `(Vector ,ts ...))
            (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
              (error 'type-check-exp "invalid index ~a" i))
-           (define new-ts (list-swap-element ts i t2 0))
+           (unless (equal? (list-ref ts i) t2)
+             (error 'type-check-exp "cannot change vector element's type from ~a to ~a" (list-ref ts i) t2))
 	   (values
              (HasType (Prim 'vector-set!
-                            (list (HasType e* `(Vector ,@new-ts)) (HasType (Int i) 'Integer) e2^))
+                            (list (HasType e* `(Vector ,@ts)) (HasType (Int i) 'Integer) e2^))
                       'Void)
            'Void)]
          [else (error "expected a vector in vector-set, not" t1)])]
@@ -178,51 +167,51 @@
       [(Prim op (list e1)) 
        (match op
 	 ['-   
-          (define-values (e1^ Te1) ((type-check-exp) e1))
+          (define-values (e1^ Te1) (recur e1))
 	  (unless (equal? Te1 'Integer)
             (error "argument to an arithmetic operator must be an integer, not" Te1))
 	  (values (HasType (Prim op (list e1^)) 'Integer) 'Integer)]
 	 ['not 
-          (define-values (e1^ Te1) ((type-check-exp) e1))
+          (define-values (e1^ Te1) (recur e1))
           (unless (equal? Te1 'Boolean)
             (error "argument to a boolean operator must be a boolean, not" Te1))
 	  (values (HasType (Prim op (list e1^)) 'Boolean) 'Boolean)])]
       [(Prim op (list e1 e2))
        (match op
          ['eq? 
-          (define-values (e1^ Te1) ((type-check-exp) e1))
-          (define-values (e2^ Te2) ((type-check-exp) e2))
+          (define-values (e1^ Te1) (recur e1))
+          (define-values (e2^ Te2) (recur e2))
           (unless (equal? Te1 Te2)
             (error "arguments to eq? must be the same type, not" Te1 'and Te2))
 	  (values (HasType (Prim op (list e1^ e2^)) 'Boolean) 'Boolean)]
          [`,y #:when (boolean-operator? op)
-          (define-values (e1^ Te1) ((type-check-exp) e1))
-          (define-values (e2^ Te2) ((type-check-exp) e2))
+          (define-values (e1^ Te1) (recur e1))
+          (define-values (e2^ Te2) (recur e2))
           (unless (equal? Te1 'Boolean)
             (error "argument to a boolean operator must be a boolean, not" Te1))
           (unless (equal? Te2 'Boolean)
             (error "argument to a boolean operator must be a boolean, not" Te2))
 	  (values (HasType (Prim op (list e1^ e2^)) 'Boolean) 'Boolean)]
          [`,y #:when (comparison-operator? op)
-          (define-values (e1^ Te1) ((type-check-exp) e1))
-          (define-values (e2^ Te2) ((type-check-exp) e2))
+          (define-values (e1^ Te1) (recur e1))
+          (define-values (e2^ Te2) (recur e2))
           (unless (equal? Te1 'Integer)
             (error "argument to a comparison operator must be a integer, not" Te1))
           (unless (equal? Te2 'Integer)
             (error "argument to a copmarison operator must be an integer, not" Te2))
 	  (values (HasType (Prim op (list e1^ e2^)) 'Boolean) 'Boolean)]
 	 [else
-          (define-values (e1^ Te1) ((type-check-exp) e1))
-          (define-values (e2^ Te2) ((type-check-exp) e2))
+          (define-values (e1^ Te1) (recur e1))
+          (define-values (e2^ Te2) (recur e2))
           (unless (equal? Te1 'Integer)
             (error "argument to an arithmetic operator must be an integer, not" Te1))
           (unless (equal? Te2 'Integer)
             (error "argument to an arithmetic operator must be an integer, not" Te2))
           (values (HasType (Prim op (list e1^ e2^)) 'Integer) 'Integer)])] 
       [(If e1 e2 e3)
-          (define-values (e1^ Te1) ((type-check-exp) e1))
-          (define-values (e2^ Te2) ((type-check-exp) e2))
-          (define-values (e3^ Te3) ((type-check-exp) e3))
+          (define-values (e1^ Te1) (recur e1))
+          (define-values (e2^ Te2) (recur e2))
+          (define-values (e3^ Te3) (recur e3))
           (unless (equal? Te1 'Boolean)
             (error "If condition must be a boolean, not" Te1))
           (unless (equal? Te2 Te3)
@@ -235,7 +224,7 @@
   (lambda (e)
     (match e
       [(Program info body)
-        (define-values (b^ Tb) ((type-check-exp) body))
+        (define-values (b^ Tb) ((type-check-exp '()) body))
 	  (unless (equal? Tb 'Integer)
             (error "result of the program must be an integer, not" Tb))
           (Program info b^)]
@@ -304,8 +293,6 @@
 (define r2p7 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '> (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
 (define r2p8 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '<= (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
 
-;;(interp-R2 (shrink ((type-check-R2 '()) r2p8)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HW1 Passes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -353,9 +340,7 @@
      (Program info ((uniquify-exp (init-symbol-table)) e))]
     ))
 
-;;(interp-R2 (uniquify (shrink ((type-check-R2 '()) r2p8))))
-
-(define uptoexpose (uniquify (shrink (type-check-R3 hw3prog))))
+(define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
 
 
 (define (expose-allocation p)
@@ -383,17 +368,17 @@
       [(HasType (Prim 'vector exps) type)
        (define i 0)
        (define bytes (* 8 (add1 (length exps))))
-       (foldr
+       (foldl
         (λ (elem acc)
           (let* ([x (string->symbol (string-append "x" (number->string i)))]
-	        [q (Let x (recur elem) acc)])
+	        [q (HasType (Let x (recur elem) acc) type)])
             (set! i (add1 i))
             q))
         (let ([q (HasType
                   (Let '_
                        (HasType
                         (If (HasType (Prim '< (list
-                                               (HasType (Prim '+ (list (GlobalValue 'free_ptr) (Int bytes))) 'Integer)
+                                               (HasType (Prim '+ (list (HasType (GlobalValue 'free_ptr) 'Integer) (HasType (Int bytes) 'Integer))) 'Integer)
                                                (HasType (GlobalValue 'fromspace_end) 'Integer))) 'Boolean)
                             (HasType (Void) 'Void)
                             (HasType (Collect bytes) 'Void)) 'Void)
@@ -401,7 +386,7 @@
                         (Let 'v
                              (HasType (Allocate (length exps) type) type)
                              (HasType
-                              (foldr
+                              (foldl
                                (λ (elem acc)
                                  (let* ([x (string->symbol (string-append "x" (number->string i)))]
                                         [xtype (match type
@@ -433,6 +418,10 @@
        (HasType (recur e) t)]
       [(Void) (Void)])))
 
+(define q (Program '() (Let 'v (Prim 'vector (list (Int 1) (Int 2))) (Prim 'vector-ref (list (Var 'v) (Int 0))))))
+
+#;(expose-allocation (uniquify (shrink (type-check-R3 q))))
+
 ;; remove-complex-opera* : R1 -> R1
 (define (remove-complex-opera* p)
     (match p
@@ -442,6 +431,7 @@
 ;; rco-atom : exp -> exp * (var * exp) list
 (define (rco-atom e)
   (match e
+    [(Void) (values (Void) '())]
     [(Var x) (values (Var x) '())]
     [(Int n) (values (Int n) '())]
     [(Bool b) (values (Bool b) '())]
@@ -449,41 +439,37 @@
      (define new-rhs (rco-exp rhs))
      (define-values (new-body body-ss) (rco-atom body))
      (values new-body (append `((,x . ,new-rhs)) body-ss))]
-    [(Prim op es) 
+    [(HasType (Prim op es) t)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (define ss (append* sss))
      (define tmp (gensym 'tmp))
-     (values (Var tmp)
-             (append ss `((,tmp . ,(Prim op new-es)))))]
-    [(If e1 e2 e3)
+     (values (HasType (Var tmp) t)
+             (append ss `((,tmp . ,(HasType (Prim op new-es) t)))))]
+    [(HasType (If e1 e2 e3) t)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
      (define ss (append* sss))
      (define tmp (gensym 'tmp))
      (match new-es
 	    [(list e1 e2 e3)
-	     (values (Var tmp)
-             (append ss `((,tmp . ,(If e1 e2 e3)))))])]
-    [(Collect n) 
+	     (values (HasType (Var tmp) t)
+             (append ss `((,tmp . ,(HasType (If e1 e2 e3) t)))))])]
+    [(HasType (Collect n) t)
      (define tmp (gensym 'tmp))
-     (values (Var tmp)
-             `((,tmp . ,(Collect n))))]
-    [(GlobalValue name) 
+     (values (HasType (Var tmp) t)
+             `((,tmp . ,(HasType (Collect n) t))))]
+    [(HasType (GlobalValue name) t) 
      (define tmp (gensym 'tmp))
-     (values (Var tmp)
-             `((,tmp . ,(GlobalValue name))))]
-    [(Allocate n t) 
+     (values (HasType (Var tmp) t)
+             `((,tmp . ,(HasType (GlobalValue name) t))))]
+    [(HasType (Allocate n t) t)
      (define tmp (gensym 'tmp))
-     (values (Var tmp)
-             `((,tmp . ,(Allocate n t))))]
+     (values (HasType (Var tmp) t)
+             `((,tmp . ,(HasType (Allocate n t) t))))]
     [(HasType e t)
-     (define-values (new-e e-ss) (rco-atom e))
-     (match new-e
-      [(Var v) 
-       (values (HasType new-e t) 
-	       (dict-set e-ss v (HasType (dict-ref e-ss v) t)))]
-      [else (values (HasType new-e t) e-ss)])]
+     (define-values (new-e ss) (rco-atom e))
+     (values (HasType new-e t) ss)]
     ))
 
 (define (make-lets^ bs e)
@@ -495,6 +481,7 @@
 ;; rco-exp : exp -> exp
 (define (rco-exp e)
   (match e
+    [(Void) (Void)]
     [(Var x) (Var x)]
     [(Int n) (Int n)]
     [(Bool b) (Bool b)]
@@ -510,18 +497,9 @@
      (match new-es
 	    [(list e1 e2 e3)
 	     (make-lets^ (append* sss) (If e1 e2 e3))])]
-    [(Collect n)
-     (define-values (new-e ss)
-       (rco-atom (Collect n)))
-     (make-lets^ ss new-e)]
-    [(GlobalValue name)
-     (define-values (new-e ss)
-       (rco-atom (GlobalValue name)))
-     (make-lets^ ss new-e)]
-    [(Allocate n t)
-     (define-values (new-e ss)
-       (rco-atom (Allocate n t)))
-     (make-lets^ ss new-e)]
+    [(Collect n) (Collect n)]
+    [(GlobalValue name) (GlobalValue name)]
+    [(Allocate n t) (Allocate n t)]
     [(HasType e t)
      (HasType (rco-exp e) t)]
     ))
@@ -571,17 +549,22 @@
 
 (define (explicate-assign r2exp v c)
   (match r2exp
+    [(Void)
+     (values (Seq (Assign v (Void)) c) '())]
+    [(Collect n)
+     (values (Seq (Collect n) c) '())]
+    [(Allocate n t)
+     (values (Seq (Assign v (Allocate n t)) c) '())]
+    [(GlobalValue name)
+     (values (Seq (Assign v (GlobalValue name)) c) '())]
     [(Int n)
      (values (Seq (Assign v (Int n)) c) '())]
     [(Bool b)
      (values (Seq (Assign v (Bool b)) c) '())]
     [(Prim 'read '())
      (values (Seq (Assign v (Prim 'read '())) c) '())]
-    [(Prim op (list e))
-     (values (Seq (Assign v (Prim op (list e))) c)
-             '())] 
-    [(Prim op (list e1 e2))
-     (values (Seq (Assign v (Prim op (list e1 e2))) c)
+    [(Prim op ls)
+     (values (Seq (Assign v (Prim op ls)) c)
              '())] 
     [(Var x)
      (values (Seq (Assign v (Var x)) c) '())]
@@ -591,7 +574,6 @@
      (values c1tail^ (cons x (append let-binds let-binds^)))]
     [(If e1 e2 e3)
      (define label (gensym 'block))
-     #;(add-vertex! globalCFG (cons label c))
      (add-vertex! globalCFG label)
      (instructions-set! label c)
      (live-before-set-set! label (list->set '()))
@@ -601,10 +583,12 @@
      (values c1tail-new (append let-binds-then let-binds-else let-binds-new))
      ]
     [(HasType e t)
-     (define-values (c1tail let-binds) (explicate-assign e))
+     (define-values (c1tail let-binds) (explicate-assign e v c))
      (match c1tail
       [(Seq (Assign v e^) tail)
-       (Seq (Assign v (HasType e^ t)) tail)])
+       (values (Seq (Assign v (HasType e^ t)) tail) let-binds)]
+      [(Seq (Collect n) tail)
+       (values (Seq (Collect n) tail) let-binds)])
      ]
     ))
 
@@ -624,7 +608,7 @@
      (live-before-set-set! label2 (list->set '()))
      (values (IfStmt (Prim 'eq? (list r2exp (Bool #t))) (Goto label1) (Goto label2))
              '())]
-    [(Prim op (list e))
+    [(Prim op ls)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
      (add-vertex! globalCFG label1)
@@ -635,17 +619,6 @@
      (live-before-set-set! label2 (list->set '()))
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())] 
-    [(Prim op (list e1 e2))
-     (define label1 (gensym 'block))
-     (define label2 (gensym 'block))
-     (add-vertex! globalCFG label1)
-     (instructions-set! label1 c1)
-     (live-before-set-set! label1 (list->set '()))
-     (add-vertex! globalCFG label2)
-     (instructions-set! label2 c2)
-     (live-before-set-set! label2 (list->set '()))
-     (values (IfStmt r2exp (Goto label1) (Goto label2))
-             '())]
     [(If e1 e2 e3)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
@@ -660,7 +633,7 @@
      (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
      (values c1tail-new (append let-binds-then let-binds-else let-binds-new)) ]
     [(HasType e t)
-     (explicate-pred e)]
+     (explicate-pred e c1 c2)]
      ))
 
 ;; explicate-control : R1 -> C0
@@ -706,15 +679,17 @@
     [(Program info (CFG es))
      (Program (dict-set info 'locals (uncover-locals-helper es)) (CFG es))]))
 
+;;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 r3_15)))))))
+
 ;; new select-instructions for R3
 
-#;(define sofar (uncover-locals
+(define sofar (uncover-locals
                (explicate-control
                 (remove-complex-opera*
                  (expose-allocation
                   (uniquify
                    (shrink
-                    (type-check-R3 hw3prog))))))))
+                    (type-check-R3 hw4prog))))))))
 
 ; atm? : c0exp -> bool
 
@@ -742,7 +717,36 @@
 ; sel-ins-stmt : C0stmt -> pseudo-x86
 ; takes in a c0 statement and converts to pseudo-x86
 
-;; do i need to worry about hastypes?????
+;; list->number : BinaryList -> Number
+(define (list->number ls)
+   (if (empty? ls)
+       0
+       (if (equal? 1 (car ls))
+           (+ (list->number (cdr ls)) (expt 2 (length (cdr ls))))
+           (list->number (cdr ls)))))
+
+;; type->binary : Type -> BinaryList
+(define (type->binary tp)
+    (if (empty? tp)
+        '()
+        (if (and (list? (car tp)) (equal? (car (car tp)) 'Vector))
+            (cons 1 (type->binary (cdr tp)))
+            (cons 0 (type->binary (cdr tp))))))
+
+
+;; calculate-tag : Number Type -> Number
+;; calculates tag using following algorithm:
+;; (1) converts given type into a binary number
+;;      - this is done by placing a 1 at the spots that the tuple has a vector, 0 otherwise
+;;      - e.g., '(Vector Int Boolean (Vector Int) Int (Vector)) => '(0 0 1 0 1)
+;; (2) calculates the length of the type
+;; (3) bitwise-or with length left-shifted 1 place and 1 (forwarding bit set)
+;; (4) left-shift the type number by 7, bitwise-or with result of (3)
+(define (calculate-tag len T)
+  (let* ([type-num (arithmetic-shift (list->number (reverse (type->binary (cdr T)))) 7)]
+         [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
+         [res (bitwise-ior type-num type-len)])
+    res))
 
 (define (sel-ins-stmt c0stmt)
   (match c0stmt
@@ -754,21 +758,22 @@
      (if (atm? e)
          (list (Instr 'movq (list (sel-ins-atm e) v)))
          (match e
+           [(HasType e^ t) (sel-ins-stmt (Assign v e^))]
            [(Allocate len T)
-            (let ([tag 4]) ;; need to actually calculate tag using bitwise stuff
+            (let ([tag (calculate-tag len T)]) ;; need to actually calculate tag using bitwise stuff
               (list (Instr 'movq (list (Global 'free_ptr) v))
                     (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
                     (Instr 'movq (list v (Reg 'r11)))
                     (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))] ;; deref r11 at 0 always?
-           [(Prim 'vector-ref (list atm (Int n)))
+           [(Prim 'vector-ref (list atm (HasType (Int n) t)))
             (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) ;; vec is atm?
                   (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]
-           [(Prim 'vector-set! (list atm1 (Int n) atm2))
+           [(Prim 'vector-set! (list atm1 (HasType (Int n) t) atm2))
             (list (Instr 'movq (list (sel-ins-atm atm1) (Reg 'r11)))
                   (Instr 'movq (list (sel-ins-atm atm2) (Deref 'r11 (* 8 (add1 n)))))
                   (Instr 'movq (list (Imm 0) v)))]
-           [(GlobalValue v) (list (Global v))] ;; ?
-           [(Void) (list (Imm 0))]
+           [(GlobalValue name) (list (Instr 'movq (list (Global name) v)))] ;; ?
+           [(Void) (list (Instr 'movq (list (Imm 0) v)))]
            [(Prim 'read '())
             (list (Callq 'read_int)
                   (Instr 'movq (list (Reg 'rax) v)))]
@@ -932,9 +937,7 @@
     [(Program info (CFG es)) 
      (for ([ls es]) (add-global-CFG-edges (car ls) (match (cdr ls)
 							       [(Block b-info instr-ls) instr-ls])))
-     (Program info (CFG (sort-blocks (tsort (transpose globalCFG)) es) #;(for/list ([ls es]) (cons (car ls) (match (cdr ls)
-							     [(Block b-info instr-ls) 
-							      (Block (uncover-live-helper (reverse instr-ls) (list->set '())) instr-ls)])))))]
+     (Program info (CFG (sort-blocks (tsort (transpose globalCFG)) es)))]
     ))
 
 
