@@ -1154,39 +1154,54 @@
 (define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
                             (7 . r10) (8 . r11) (9 . r12) (10 . r13) (11 . r14)))
 
+
+(define spilled-root (set))
+(define spilled-stack (set))
+
 ;; change sig to
 ;; allocate-registers-exp : pseudo-x86 [Var . Nat] -> pseudo-x86
 
-(define (allocate-registers-exp e coloring)
+(define (allocate-registers-exp e coloring locals)
     (match e
       [(Reg reg) (Reg reg)]
       [(Imm int) (Imm int)]
-      [(Var v) (let ([colnum (dict-ref coloring v)])
-                 (if (<= colnum 11)
-                     (Reg (dict-ref REGCOLS colnum))
-                     (Deref 'rbp (+ 48 (* -8 (- colnum 11))))))]
-      [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring)
-                                                     (allocate-registers-exp e2 coloring)))]
-      [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring)
-                                                     (allocate-registers-exp e2 coloring)))]
-      [(Instr 'movq (list e1 e2)) (Instr 'movq (list (allocate-registers-exp e1 coloring)
-                                                     (allocate-registers-exp e2 coloring)))]
-      [(Instr 'movzbq (list e1 e2)) (Instr 'movzbq (list (allocate-registers-exp e1 coloring)
-                                                     (allocate-registers-exp e2 coloring)))]
-      [(Instr 'cmpq (list e1 e2)) (Instr 'cmpq (list (allocate-registers-exp e1 coloring)
-                                                     (allocate-registers-exp e2 coloring)))]
-      [(Instr 'xorq (list e1 e2)) (Instr 'xorq (list (allocate-registers-exp e1 coloring)
-                                                     (allocate-registers-exp e2 coloring)))]
+      [(Deref v i) (Deref v i)]
+      [(Var v) (if (and (list? (dict-ref locals v)) (equal? (car (dict-ref locals v)) 'Vector))
+                  (let ([colnum (dict-ref coloring v)])
+                    (if (<= colnum 11)
+                        (Reg (dict-ref REGCOLS colnum))
+                        (begin 
+                        (set-add! spilled-root v)
+                        (Deref 'r15 (* -8 (add1 (- colnum 11)))))))
+                  (let ([colnum (dict-ref coloring v)])
+                    (if (<= colnum 11)
+                        (Reg (dict-ref REGCOLS colnum))
+                        (begin
+                        (set-add! spilled-stack v)
+                        (Deref 'rbp (+ 48 (* -8 (- colnum 11))))))))]
+      [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
+                                                     (allocate-registers-exp e2 coloring locals)))]
+      [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring locals)
+                                                     (allocate-registers-exp e2 coloring locals)))]
+      [(Instr 'movq (list e1 e2)) (Instr 'movq (list (allocate-registers-exp e1 coloring locals)
+                                                     (allocate-registers-exp e2 coloring locals)))]
+      [(Instr 'movzbq (list e1 e2)) (Instr 'movzbq (list (allocate-registers-exp e1 coloring locals)
+                                                     (allocate-registers-exp e2 coloring locals)))]
+      [(Instr 'cmpq (list e1 e2)) (Instr 'cmpq (list (allocate-registers-exp e1 coloring locals)
+                                                     (allocate-registers-exp e2 coloring locals)))]
+      [(Instr 'xorq (list e1 e2)) (Instr 'xorq (list (allocate-registers-exp e1 coloring locals)
+                                                     (allocate-registers-exp e2 coloring locals)))]
       [(Instr 'set (list cc e)) (Instr 'set (list cc
-                                                     (allocate-registers-exp e coloring)))]
-      [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 coloring)))]
+                                                     (allocate-registers-exp e coloring locals)))]
+      [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 coloring locals)))]
       [(Callq l) (Callq l)]
       [(Retq) (Retq)]
-      [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 coloring)))]
-      [(Instr 'popq (list e1)) (Instr 'popq (list (allocate-registers-exp e1 coloring)))]
+      [(Global var) (Global var)]
+      [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 coloring locals)))]
+      [(Instr 'popq (list e1)) (Instr 'popq (list (allocate-registers-exp e1 coloring locals)))]
       [(Jmp e1) (Jmp e1)]
       [(JmpIf cc label) (JmpIf cc label)]
-      [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e coloring)))]))
+      [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e coloring locals)))]))
 
 #;(define (allocate-registers-exp e ig vars)
   (let* ([hash (make-hash (map (λ (var) `(,var . ())) vars))]
@@ -1230,18 +1245,21 @@
     [(Program info (CFG es))
      (for ([vertex (get-vertices globalCFG)]) (remove-vertex! globalCFG vertex))
      (let ([coloring (color-graph (dict-ref info 'conflicts)
-                                  (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals))))])
+                                  (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))))])
        (Program (list (cons 'stack-space (let ([f (* 8 (- (if (> (length coloring) 0)
                                                               (apply max (map (λ (assoc) (cdr assoc)) coloring))
                                                               0) 11))])
                                            (if (negative? f)
                                                0
-                                               f #;(+ f (modulo f 16))))))
+                                               f #;(+ f (modulo f 16)))))
+                      (cons 'num-spills `(,(set-count spilled-stack) . ,(set-count spilled-root)))
+                )
                 (CFG 
                  (for/list ([ls es]) (cons (car ls)
                                            (allocate-registers-exp
                                             (cdr ls)
-                                            coloring)
+                                            coloring
+                                            (dict-ref info 'locals))
                                            #;(allocate-registers-exp (cdr ls)
                                                                      (dict-ref info 'conflicts)
                                                                      (dict-ref info 'locals)))))))]))
@@ -1316,6 +1334,8 @@
 ;; fix movzbq target arg must be register (move stack var into reg for it)
 
 (define (patch-instructions-instr px86instr)
+  (set! spilled-root (set))
+  (set! spilled-stack (set))
   (match px86instr
     [(Instr 'cmpq (list e1 e2))
      (match e2
