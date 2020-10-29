@@ -456,6 +456,8 @@
 	     (values (HasType (Var tmp) t)
              (append ss `((,tmp . ,(HasType (If e1 e2 e3) t)))))])]
     [(HasType (Collect n) t)
+     (values (HasType (Collect n) t) '())]
+    #;[(HasType (Collect n) t)
      (define tmp (gensym 'tmp))
      (values (HasType (Var tmp) t)
              `((,tmp . ,(HasType (Collect n) t))))]
@@ -1155,8 +1157,8 @@
                             (7 . r10) (8 . r11) (9 . r12) (10 . r13) (11 . r14)))
 
 
-(define spilled-root (set))
-(define spilled-stack (set))
+(define spilled-root (mutable-set))
+(define spilled-stack (mutable-set))
 
 ;; change sig to
 ;; allocate-registers-exp : pseudo-x86 [Var . Nat] -> pseudo-x86
@@ -1171,13 +1173,13 @@
                     (if (<= colnum 11)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin 
-                        (set-add! spilled-root v)
+                        (set-add! spilled-root (* -8 (add1 (- colnum 11))))
                         (Deref 'r15 (* -8 (add1 (- colnum 11)))))))
                   (let ([colnum (dict-ref coloring v)])
                     (if (<= colnum 11)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin
-                        (set-add! spilled-stack v)
+                        (set-add! spilled-stack (+ 48 (* -8 (- colnum 11))))
                         (Deref 'rbp (+ 48 (* -8 (- colnum 11))))))))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
                                                      (allocate-registers-exp e2 coloring locals)))]
@@ -1244,25 +1246,28 @@
   (match p
     [(Program info (CFG es))
      (for ([vertex (get-vertices globalCFG)]) (remove-vertex! globalCFG vertex))
-     (let ([coloring (color-graph (dict-ref info 'conflicts)
-                                  (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))))])
+     (let* ([coloring (color-graph (dict-ref info 'conflicts)
+                                  (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))))]
+	    [es^ (for/list ([ls es]) (cons (car ls)
+                                           (allocate-registers-exp
+                                            (cdr ls)
+                                            coloring
+                                            (dict-ref info 'locals))
+                                           ))])
+       (define s1 (set-count spilled-stack))
+       (define s2 (set-count spilled-root)) 
+       (set! spilled-root (mutable-set))
+       (set! spilled-stack (mutable-set))
        (Program (list (cons 'stack-space (let ([f (* 8 (- (if (> (length coloring) 0)
                                                               (apply max (map (λ (assoc) (cdr assoc)) coloring))
                                                               0) 11))])
                                            (if (negative? f)
                                                0
                                                f #;(+ f (modulo f 16)))))
-                      (cons 'num-spills `(,(set-count spilled-stack) . ,(set-count spilled-root)))
+                      (cons 'num-spills `(,(+ s1 s2) . ,(+ s1 s2)))
                 )
                 (CFG 
-                 (for/list ([ls es]) (cons (car ls)
-                                           (allocate-registers-exp
-                                            (cdr ls)
-                                            coloring
-                                            (dict-ref info 'locals))
-                                           #;(allocate-registers-exp (cdr ls)
-                                                                     (dict-ref info 'conflicts)
-                                                                     (dict-ref info 'locals)))))))]))
+                 es^)))]))
 
 (define r2_1_program (Program '() (Let 'x (Bool #t) (Int 42))))
 (define r2_12_program (Program '() (If (If (Prim 'not (list (Bool #t))) (Bool #f) (Bool #t)) (Int 42) (Int 777))))
@@ -1334,8 +1339,6 @@
 ;; fix movzbq target arg must be register (move stack var into reg for it)
 
 (define (patch-instructions-instr px86instr)
-  (set! spilled-root (set))
-  (set! spilled-stack (set))
   (match px86instr
     [(Instr 'cmpq (list e1 e2))
      (match e2
