@@ -456,8 +456,6 @@
 	    [(list e1 e2 e3)
 	     (values (HasType (Var tmp) t)
              (append ss `((,tmp . ,(HasType (If e1 e2 e3) t)))))])]
-    #;[(HasType (Collect n) t)
-     (values (HasType (Collect n) t) '())]
     [(HasType (Collect n) t)
      (define tmp (gensym 'tmp))
      (values (HasType (Void) t)
@@ -1250,20 +1248,9 @@
                 (CFG 
                  es^)))]))
 
-(define r2_1_program (Program '() (Let 'x (Bool #t) (Int 42))))
-(define r2_12_program (Program '() (If (If (Prim 'not (list (Bool #t))) (Bool #f) (Bool #t)) (Int 42) (Int 777))))
-(define r2_15_program (Program '() (If (Prim 'eq? (list (Let 'x (Int 42) (If (Prim 'eq? (list (Var 'x) (Int 42))) (Var 'x) (Int 20))) (Int 42))) (Int 42) (Int 777))))
-#;(uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))
-#;(for/list ([e (get-vertices globalCFG)]) (cons e (get-neighbors (transpose globalCFG) e)))
-#;(match (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))
-       [(Program info (CFG es))
-		 (for/list ([p es]) (match (cdr p) 
-				      [(Block info es) 
-				       (cons (car p) info)]))])
 
-#;(allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))))
-
-
+(define tuples-and-gc-prog (Program '() (Prim 'vector-ref (list (Prim 'vector-ref (list (Prim 'vector (list (Prim 'vector (list (Int 42))))) (Int 0))) (Int 0)))))
+(remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog)))))
 
 ;; Grant
 
