@@ -343,6 +343,7 @@
 (define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
 
 
+
 (define (expose-allocation p)
   (match p
       [(Program info e)
@@ -447,19 +448,16 @@
      (values (HasType (Var tmp) t)
              (append ss `((,tmp . ,(HasType (Prim op new-es) t)))))]
     [(HasType (If e1 e2 e3) t)
-     (define-values (new-es sss)
-       (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
-     (define ss (append* sss))
+     (define new-es
+       (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
      (define tmp (gensym 'tmp))
      (match new-es
 	    [(list e1 e2 e3)
 	     (values (HasType (Var tmp) t)
-             (append ss `((,tmp . ,(HasType (If e1 e2 e3) t)))))])]
+             `((,tmp . ,(HasType (If e1 e2 e3) t))))])]
     [(HasType (Collect n) t)
-     (values (HasType (Collect n) t) '())]
-    #;[(HasType (Collect n) t)
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) t)
+     (values (HasType (Void) t)
              `((,tmp . ,(HasType (Collect n) t))))]
     [(HasType (GlobalValue name) t) 
      (define tmp (gensym 'tmp))
@@ -494,11 +492,11 @@
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (make-lets^ (append* sss) (Prim op new-es))]
     [(If e1 e2 e3)
-     (define-values (new-es sss)
-       (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
+     (define new-es
+       (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
      (match new-es
 	    [(list e1 e2 e3)
-	     (make-lets^ (append* sss) (If e1 e2 e3))])]
+	     (If e1 e2 e3)])]
     [(Collect n) (Collect n)]
     [(GlobalValue name) (GlobalValue name)]
     [(Allocate n t) (Allocate n t)]
@@ -621,6 +619,19 @@
      (live-before-set-set! label2 (list->set '()))
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())] 
+    #;[(Let x e body)
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
+     (define-values (c1tail let-binds) (explicate-pred body (Goto label1) (Goto label2)))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) body))
+     (values c1tail^ (append let-binds^ let-binds))
+     ]
     [(If e1 e2 e3)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
@@ -685,7 +696,7 @@
 
 ;; new select-instructions for R3
 
-(define sofar (uncover-locals
+#;(define sofar (uncover-locals
                (explicate-control
                 (remove-complex-opera*
                  (expose-allocation
@@ -749,6 +760,9 @@
          [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
          [res (bitwise-ior type-num type-len)])
     res))
+
+;;(calculate-tag 2 '(Vector (Vector Integer) (Vector Integer)))
+;;(calculate-tag 3 '(Vector Integer Integer (Vector Integer)))
 
 (define (sel-ins-stmt c0stmt)
   (match c0stmt
@@ -1003,6 +1017,8 @@
        ast]
       [(Callq f)
        (define vector-vars
+	 (filter (lambda (x) (not (equal? x '()))) (for/list ([e locals]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '()))))
+       #;(define vector-vars
                (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
        (if (eqv? f 'collect)
            (for ([v live-after])
@@ -1027,8 +1043,9 @@
                (verbose "skip self edge on" v)
                (add-edge! g d v))))
        ast])))
-                       
-                  
+
+;;(filter (lambda (x) (not (equal? x '()))) (for/list ([e `((x . (Vector Integer Integer)) (y . (Vector Integer)) (z . Integer))]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '())))                      
+;;(filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (equal? 'Vector (caadr x)) (car x))) `((x . (Vector Integer Integer)) (y . (Vector Integer)) (z . Integer)))                 
 
 (define (build-interference-block^ ast g locals)
   (match ast
@@ -1075,13 +1092,22 @@
 ;; choose-least : [Nat] Nat -> Nat
 ;; returns the smallest Nat not in the given set
 
-(define (choose-least satset cand)
-  (if (empty? satset)
+(define (vector-type? locals v) 
+  (match (dict-ref locals v)
+	 [`(Vector ,ts ...)
+	   #t]
+	 [else 
+	   #f]))
+
+(define (choose-least satset cand locals v)
+  (if (and (not (member cand satset)) 
+	   (or (and (even? cand) 
+		    (vector-type? locals v)) 
+	       (and (odd? cand) 
+		    (not (vector-type? locals v)))))
       cand
-      (let ([m (apply min satset)])
-        (if (< cand m)
-            cand
-            (choose-least (remove m satset) (add1 cand))))))
+      (choose-least satset (add1 cand) locals v)
+      ))
 
 ;; hash-key : [Hash Key Val] Val -> Key
 ;; returns the (a) key that maps to given val
@@ -1131,7 +1157,7 @@
 
 
 
-(define (color-graph ig hash)
+(define (color-graph ig hash locals)
   (if (hash-empty? hash)
       empty
       (let* ([maxsat (get-longest-val hash)]
@@ -1139,7 +1165,7 @@
              [adj-verts (if (has-vertex? ig maxsat-vert)
                             (get-neighbors ig maxsat-vert)
                             '())]
-             [col (choose-least maxsat 0)])
+             [col (choose-least maxsat 0 locals maxsat-vert)])
         (for-each (λ (vert) (if (and (hash-has-key? hash vert)
                                      (not (member col (hash-ref hash vert))))
                                 (hash-set! hash vert
@@ -1147,7 +1173,7 @@
                                 hash))
                       adj-verts)
         (hash-remove! hash maxsat-vert)
-        (cons `(,maxsat-vert . ,col) (color-graph ig hash)))))
+        (cons `(,maxsat-vert . ,col) (color-graph ig hash locals)))))
 
 ;; allocate-registers-exp : pseudo-x86 InterferenceGraph [Var] [Var . Home] -> pseudo-x86
 ;; takes in pseudo-x86 exp, intereference graph, and list of vars, returns
@@ -1168,19 +1194,21 @@
       [(Reg reg) (Reg reg)]
       [(Imm int) (Imm int)]
       [(Deref v i) (Deref v i)]
-      [(Var v) (if (and (list? (dict-ref locals v)) (equal? (car (dict-ref locals v)) 'Vector))
+      [(Var v) (if (vector-type? locals v)
                   (let ([colnum (dict-ref coloring v)])
                     (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin 
-                        (set-add! spilled-root (* -8 (add1 (- colnum 10))))
-                        (Deref 'r15 (* -8 (add1 (- colnum 10)))))))
+			  (let ([location (* 8 (add1 (quotient (- colnum 10) 2)))])
+                          (set-add! spilled-root location)
+                          (Deref 'r15 location)))))
                   (let ([colnum (dict-ref coloring v)])
                     (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin
-                        (set-add! spilled-stack (+ 48 (* -8 (- colnum 10))))
-                        (Deref 'rbp (+ 48 (* -8 (- colnum 10))))))))]
+			  (let ([location (* -8 (quotient (- colnum 10) 2))])
+                          (set-add! spilled-stack location)
+                          (Deref 'rbp location))))))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
                                                      (allocate-registers-exp e2 coloring locals)))]
       [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring locals)
@@ -1205,49 +1233,12 @@
       [(JmpIf cc label) (JmpIf cc label)]
       [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e coloring locals)))]))
 
-#;(define (allocate-registers-exp e ig vars)
-  (let* ([hash (make-hash (map (λ (var) `(,var . ())) vars))]
-         [coloring (color-graph ig hash)])
-    (match e
-      [(Reg reg) (Reg reg)]
-      [(Imm int) (Imm int)]
-      [(Var v) (let ([colnum (dict-ref coloring v)])
-                 (if (<= colnum 11)
-                     (Reg (dict-ref REGCOLS colnum))
-                     (Deref 'rbp (* -8 (- colnum 11)))))]
-      [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 ig vars)
-                                                     (allocate-registers-exp e2 ig vars)))]
-      [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 ig vars)
-                                                     (allocate-registers-exp e2 ig vars)))]
-      [(Instr 'movq (list e1 e2)) (Instr 'movq (list (allocate-registers-exp e1 ig vars)
-                                                     (allocate-registers-exp e2 ig vars)))]
-      [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 ig vars)))]
-      [(Callq l) (Callq l)]
-      [(Retq) (Retq)]
-      [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 ig vars)))]
-      [(Instr 'popq (list e1)) (Instr 'popq (list (allocate-registers-exp e1 ig vars)))]
-      [(Jmp e1) (Jmp e1)]
-      [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e ig vars)))])))
-
-#;(define (allocate-registers p)
-  (match p
-    [(Program info (CFG es))
-     (Program (list (cons 'stack-space 16 #;(calc-stack-space (dict-ref info 'locals) #;(cdr (car info)))))
-              (CFG (for/list ([ls es]) (cons (car ls)
-                                             (allocate-registers-exp
-                                              (cdr ls)
-                                              (color-graph (dict-ref info 'conflicts)
-                                                           (make-hash (map (λ (var) `(,var . ())) (dict-ref info 'locals)))))
-                                             #;(allocate-registers-exp (cdr ls)
-                                                                     (dict-ref info 'conflicts)
-                                                                     (dict-ref info 'locals))))))]))
-
 (define (allocate-registers p)
   (match p
     [(Program info (CFG es))
      (for ([vertex (get-vertices globalCFG)]) (remove-vertex! globalCFG vertex))
      (let* ([coloring (color-graph (dict-ref info 'conflicts)
-                                  (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))))]
+                                  (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))) (dict-ref info 'locals))]
 	    [es^ (for/list ([ls es]) (cons (car ls)
                                            (allocate-registers-exp
                                             (cdr ls)
@@ -1258,78 +1249,20 @@
        (define s2 (set-count spilled-root)) 
        (set! spilled-root (mutable-set))
        (set! spilled-stack (mutable-set))
-       (Program (list (cons 'stack-space (let ([f (* 8 (- (if (> (length coloring) 0)
+       (Program (list (cons 'stack-space (* 8 s1) #;(let ([f (* 8 (- (if (> (length coloring) 0)
                                                               (apply max (map (λ (assoc) (cdr assoc)) coloring))
                                                               0) 11))])
                                            (if (negative? f)
                                                0
                                                f #;(+ f (modulo f 16)))))
-                      (cons 'num-spills `(,(+ s1 s2) . ,(+ s1 s2)))
+                      (cons 'num-spills `(,s1 . ,s2))
                 )
                 (CFG 
                  es^)))]))
 
-(define r2_1_program (Program '() (Let 'x (Bool #t) (Int 42))))
-(define r2_12_program (Program '() (If (If (Prim 'not (list (Bool #t))) (Bool #f) (Bool #t)) (Int 42) (Int 777))))
-(define r2_15_program (Program '() (If (Prim 'eq? (list (Let 'x (Int 42) (If (Prim 'eq? (list (Var 'x) (Int 42))) (Var 'x) (Int 20))) (Int 42))) (Int 42) (Int 777))))
-#;(uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))
-#;(for/list ([e (get-vertices globalCFG)]) (cons e (get-neighbors (transpose globalCFG) e)))
-#;(match (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))
-       [(Program info (CFG es))
-		 (for/list ([p es]) (match (cdr p) 
-				      [(Block info es) 
-				       (cons (car p) info)]))])
 
-#;(allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2_15_program)))))))))
-;; assign-homes : pseudo-x86 -> pseudo-x86
-
-(define (calc-stack-space ls)
-  (cond
-    [(null? ls) 0]
-    [else (+ 8 (calc-stack-space (cdr ls)))]
-    ))
-
-(define (find-index v ls)
-  (cond
-    ;;[(eq? v (Var-name (car ls))) 1]
-    [(eq? v (car ls)) 1]
-    [else (add1 (find-index v (cdr ls)))]
-    ))
-
-;; simplify
-;; todo: FIX PUSHQ/POPQ
-#|
-(define (assign-homes-exp e ls)
-  (match e
-    [(Reg reg) (Reg reg)]
-    [(Imm int) (Imm int)]
-    [(Var v) (Deref 'rbp (* -8 (find-index v (cdr ls))))]
-    [(Instr 'addq (list e1 e2)) (Instr 'addq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
-    [(Instr 'subq (list e1 e2)) (Instr 'subq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
-    [(Instr 'movq (list e1 e2)) (Instr 'movq (list (assign-homes-exp e1 ls) (assign-homes-exp e2 ls)))]
-    [(Instr 'negq (list e1)) (Instr 'negq (list (assign-homes-exp e1 ls)))]
-    [(Callq l) (Callq l)]
-    [(Retq) (Retq)]
-    [(Instr 'pushq (list e1)) (Instr 'pushq (list (assign-homes e1 ls)))]
-    [(Instr 'popq (list e1)) (Instr 'popq (list (assign-homes e1 ls)))]
-    [(Jmp e1) (Jmp e1)]
-    [(Block info es) (Block info (for/list ([e es]) (assign-homes-exp e ls)))]
-    ))
-
-(define (assign-homes p)
-  (match p
-    [(Program info (CFG es)) (Program (list (cons 'stack-space (calc-stack-space (cdr (car info)))))
-                                      (CFG (for/list ([ls es]) (cons (car ls) (assign-homes-exp (cdr ls) (car info))))))]
-    ))
-|#
-;; note: assign-homes passes all tests in run-tests.rkt
-
-;;TEST
-;;(assign-homes (Program (list (cons 'locals (list (Var 'x) (Var 'y)))) (CFG (list (cons 'start (Block '() (list (Instr 'movq (list (Imm 42) (Var 'y))) (Instr 'negq (list (Var 'y))) (Instr 'movq (list (Var 'y) (Var 'x))) (Instr 'movq (list (Var 'x) (Reg 'rax))) (Instr 'negq (list (Reg 'rax))) (Jmp 'conclusion))))))))
-;;(assign-homes (select-instructions (explicate-control r1program-let)))
-;;(let ([x (+ (read) (read))]) x)
-;(remove-complex-opera* (uniquify (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x)))))
-
+(define tuples-and-gc-prog (Program '() (Prim 'vector-ref (list (Prim 'vector-ref (list (Prim 'vector (list (Prim 'vector (list (Int 42))))) (Int 0))) (Int 0)))))
+(remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog)))))
 
 ;; Grant
 
