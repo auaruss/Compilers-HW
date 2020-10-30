@@ -448,14 +448,13 @@
      (values (HasType (Var tmp) t)
              (append ss `((,tmp . ,(HasType (Prim op new-es) t)))))]
     [(HasType (If e1 e2 e3) t)
-     (define-values (new-es sss)
-       (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
-     (define ss (append* sss))
+     (define new-es
+       (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
      (define tmp (gensym 'tmp))
      (match new-es
 	    [(list e1 e2 e3)
 	     (values (HasType (Var tmp) t)
-             (append ss `((,tmp . ,(HasType (If e1 e2 e3) t)))))])]
+             `((,tmp . ,(HasType (If e1 e2 e3) t))))])]
     [(HasType (Collect n) t)
      (define tmp (gensym 'tmp))
      (values (HasType (Void) t)
@@ -493,11 +492,11 @@
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (make-lets^ (append* sss) (Prim op new-es))]
     [(If e1 e2 e3)
-     (define-values (new-es sss)
-       (for/lists (l1 l2) ([e (list e1 e2 e3)]) (rco-atom e)))
+     (define new-es
+       (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
      (match new-es
 	    [(list e1 e2 e3)
-	     (make-lets^ (append* sss) (If e1 e2 e3))])]
+	     (If e1 e2 e3)])]
     [(Collect n) (Collect n)]
     [(GlobalValue name) (GlobalValue name)]
     [(Allocate n t) (Allocate n t)]
@@ -620,6 +619,19 @@
      (live-before-set-set! label2 (list->set '()))
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())] 
+    [(Let x e body)
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
+     (define-values (c1tail let-binds) (explicate-pred body (Goto label1) (Goto label2)))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) body))
+     (values c1tail^ (append let-binds^ let-binds))
+     ]
     [(If e1 e2 e3)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
