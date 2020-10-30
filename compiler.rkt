@@ -1250,7 +1250,7 @@
 
 
 (define tuples-and-gc-prog (Program '() (Prim 'vector-ref (list (Prim 'vector-ref (list (Prim 'vector (list (Prim 'vector (list (Int 42))))) (Int 0))) (Int 0)))))
-(remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog)))))
+(explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog))))))
 
 ;; Grant
 
