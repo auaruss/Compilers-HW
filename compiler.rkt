@@ -1007,6 +1007,8 @@
        ast]
       [(Callq f)
        (define vector-vars
+	 (filter (lambda (x) (not (equal? x '()))) (for/list ([e locals]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '()))))
+       #;(define vector-vars
                (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
        (if (eqv? f 'collect)
            (for ([v live-after])
@@ -1031,8 +1033,9 @@
                (verbose "skip self edge on" v)
                (add-edge! g d v))))
        ast])))
-                       
-                  
+
+;;(filter (lambda (x) (not (equal? x '()))) (for/list ([e `((x . (Vector Integer Integer)) (y . (Vector Integer)) (z . Integer))]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '())))                      
+;;(filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (equal? 'Vector (caadr x)) (car x))) `((x . (Vector Integer Integer)) (y . (Vector Integer)) (z . Integer)))                 
 
 (define (build-interference-block^ ast g locals)
   (match ast
