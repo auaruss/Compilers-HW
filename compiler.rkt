@@ -1154,7 +1154,7 @@
 ;; a pseudo-x86 exp with allocated registers according to color-graph
 
 (define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
-                            (7 . r10) (8 . r11) (9 . r12) (10 . r13) (11 . r14)))
+                            (7 . r10) #;(8 . r11) (8 . r12) (9 . r13) (10 . r14)))
 
 
 (define spilled-root (mutable-set))
@@ -1170,17 +1170,17 @@
       [(Deref v i) (Deref v i)]
       [(Var v) (if (and (list? (dict-ref locals v)) (equal? (car (dict-ref locals v)) 'Vector))
                   (let ([colnum (dict-ref coloring v)])
-                    (if (<= colnum 11)
+                    (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin 
-                        (set-add! spilled-root (* -8 (add1 (- colnum 11))))
-                        (Deref 'r15 (* -8 (add1 (- colnum 11)))))))
+                        (set-add! spilled-root (* -8 (add1 (- colnum 10))))
+                        (Deref 'r15 (* -8 (add1 (- colnum 10)))))))
                   (let ([colnum (dict-ref coloring v)])
-                    (if (<= colnum 11)
+                    (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin
-                        (set-add! spilled-stack (+ 48 (* -8 (- colnum 11))))
-                        (Deref 'rbp (+ 48 (* -8 (- colnum 11))))))))]
+                        (set-add! spilled-stack (+ 48 (* -8 (- colnum 10))))
+                        (Deref 'rbp (+ 48 (* -8 (- colnum 10))))))))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
                                                      (allocate-registers-exp e2 coloring locals)))]
       [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring locals)
