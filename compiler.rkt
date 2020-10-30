@@ -619,7 +619,7 @@
      (live-before-set-set! label2 (list->set '()))
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())] 
-    [(Let x e body)
+    #;[(Let x e body)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
      (add-vertex! globalCFG label1)
@@ -696,7 +696,7 @@
 
 ;; new select-instructions for R3
 
-(define sofar (uncover-locals
+#;(define sofar (uncover-locals
                (explicate-control
                 (remove-complex-opera*
                  (expose-allocation
@@ -1262,7 +1262,7 @@
 
 
 (define tuples-and-gc-prog (Program '() (Prim 'vector-ref (list (Prim 'vector-ref (list (Prim 'vector (list (Prim 'vector (list (Int 42))))) (Int 0))) (Int 0)))))
-(explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog))))))
+(remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog)))))
 
 ;; Grant
 
