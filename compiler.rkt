@@ -487,10 +487,10 @@
     [(Bool b) (Bool b)]
     [(Let x rhs body)
      (Let x (rco-exp rhs) (rco-exp body))]
-    [(Prim op es)
+    [(HasType (Prim op es) t)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
-     (make-lets^ (append* sss) (Prim op new-es))]
+     (make-lets^ (append* sss) (HasType (Prim op new-es) t))]
     [(If e1 e2 e3)
      (define new-es
        (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
@@ -619,7 +619,7 @@
      (live-before-set-set! label2 (list->set '()))
      (values (IfStmt r2exp (Goto label1) (Goto label2))
              '())] 
-    #;[(Let x e body)
+    [(Let x e body)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
      (add-vertex! globalCFG label1)
@@ -628,9 +628,10 @@
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
-     (define-values (c1tail let-binds) (explicate-pred body (Goto label1) (Goto label2)))
-     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) body))
-     (values c1tail^ (append let-binds^ let-binds))
+     (define temp (gensym 'tmp))
+     (define-values (c1tail let-binds) (explicate-assign body (Var temp) (IfStmt (Prim 'eq? (list (Var temp) (Bool #t))) (Goto label1) (Goto label2))))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail))
+     (values c1tail^ (cons x (cons temp (append let-binds let-binds^))))
      ]
     [(If e1 e2 e3)
      (define label1 (gensym 'block))
@@ -844,6 +845,13 @@
      (append x86stmt x86tail)]
     [(Goto label)
      (list (Jmp label)) ]
+    [(IfStmt (Prim 'vector-ref (list v (HasType (Int i) 'Integer))) (Goto label1) (Goto label2))
+     (let ([v_ (sel-ins-atm v)])
+       (list
+	(Instr 'movq (list v_ (Reg 'r11)))
+        (Instr 'cmpq (list (Imm 1) (Deref 'r11 (* 8 (add1 i)))))
+        (JmpIf 'e label1)
+        (Jmp label2)))]
     [(IfStmt (Prim 'eq? (list arg1 arg2)) (Goto label1) (Goto label2))
      (let ([arg1_ (sel-ins-atm arg1)]
            [arg2_ (sel-ins-atm arg2)])
@@ -1262,7 +1270,7 @@
 
 
 (define tuples-and-gc-prog (Program '() (Prim 'vector-ref (list (Prim 'vector-ref (list (Prim 'vector (list (Prim 'vector (list (Int 42))))) (Int 0))) (Int 0)))))
-(remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog)))))
+#;(explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog))))))
 
 ;; Grant
 
