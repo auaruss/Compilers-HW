@@ -68,10 +68,6 @@
 (test-pe (parse-program `(program () (+ 1 (+ 3 1)))))
 (test-pe (parse-program `(program () (- (+ 3 (- 5))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; HW3 Passes
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 ;; example program from lecture:
 #;(let ([v (vector 42)])
     (let ([w (vector v)])
@@ -293,10 +289,6 @@
 (define r2p7 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '> (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
 (define r2p8 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '<= (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; HW1 Passes
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (define uniquify-exp
   (λ (symtab)
     (λ (exp)
@@ -508,8 +500,6 @@
 (define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
 
 ;;(interp-R2 (remove-complex-opera* (uniquify (shrink ((type-check-R2 '()) r2p8)))))
-
-;; Sam
 
 ; explicate-tail : R1 -> C0Tail x [Var]
 ; takes in R1 expression and produces C0 Tail and list of let-bound variables
@@ -873,14 +863,6 @@
     [(Program info (CFG es))
      (Program info (CFG (for/list ([ls es]) (cons (car ls) (Block '() (sel-ins-tail (cdr ls)))))))]))
 
-;;(explicate-control (remove-complex-opera* (uniquify (shrink (type-check-R2 r2p8)))))
-;; I think this is right...
-;; todo: check/test !
-
-;; note: select-instructions passes all tests in run-tests.rkt
-
-;; /Sam
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -989,7 +971,6 @@
 ;; movzbq is similar to movq
 ;; consider register al the same as rax
 
-
 (define caller-save-for-alloc^ '(al rax rdx rcx rsi rdi r8 r9 r10 r11))
 (define callee-save-for-alloc^ '(rsp rbp rbx r12 r13 r14 r15))
 
@@ -1082,13 +1063,7 @@
 ;; gets longest list in list of lists
 
 (define (get-longest ls)
-  (foldr (λ (e acc) (if (> (length e) (length acc)) e acc)) (car ls) (cdr ls))
-  #;(if (empty? ls)
-      '()
-      (if (>= (length (first ls))
-              (length (get-longest (rest ls))))
-          (first ls)
-          (get-longest (rest ls)))))
+  (foldr (λ (e acc) (if (> (length e) (length acc)) e acc)) (car ls) (cdr ls)))
 
 ;; get-longest-val : [Hash Any List] -> List
 ;; get the longest value in hash
