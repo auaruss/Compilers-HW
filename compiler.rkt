@@ -1331,7 +1331,7 @@
                          (Retq))))))
 
 (define root-stack-size 16384)
-(define heap-size 16)
+(define heap-size 16384)
 
 (define (initialize-garbage-collector root-spills)
   (append (list (Instr 'movq (list (Imm root-stack-size) (Reg 'rdi)))
