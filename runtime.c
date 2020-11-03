@@ -90,6 +90,7 @@ void initialize(uint64_t rootstack_size, uint64_t heap_size)
   // 1. Check to make sure that our assumptions about the world are correct.
   assert(sizeof(int64_t) == sizeof(int64_t*));
   assert((heap_size % sizeof(int64_t)) == 0);
+  //printf("\n%d\n", rootstack_size);
   assert((rootstack_size % sizeof(int64_t)) == 0);
 
   // 2. Allocate memory (You should always check if malloc gave you memory)
