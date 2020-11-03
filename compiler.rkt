@@ -687,14 +687,6 @@
 
 ;; new select-instructions for R3
 
-#;(define sofar (uncover-locals
-               (explicate-control
-                (remove-complex-opera*
-                 (expose-allocation
-                  (uniquify
-                   (shrink
-                    (type-check-R3 hw4prog))))))))
-
 ; atm? : c0exp -> bool
 
 (define (atm? c0exp)
@@ -1191,7 +1183,7 @@
                         (begin
 			  (let ([location (* -8 (quotient (- colnum 10) 2))])
                           (set-add! spilled-stack location)
-                          (Deref 'rbp location))))))]
+                          (Deref 'rbp (- location 32)))))))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
                                                      (allocate-registers-exp e2 coloring locals)))]
       [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring locals)
@@ -1266,12 +1258,17 @@
        [_ (list (Instr 'movzbq (list e1 e2)))])]
     [(Instr op (list e1 e2)) 
      (match (list e1 e2)
-       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax))) (Instr op (list (Reg 'rax) e2)))]
-       [(list x y) (list (Instr op (list e1 e2)))]
-       )]
+       [(list (Global name) (Deref a b)) (list (Instr 'movq (list e1 (Reg 'rax)))
+                                               (Instr op (list (Reg 'rax) e2)))]
+       [(list (Deref a b) (Deref c d)) (list (Instr 'movq (list e1 (Reg 'rax)))
+                                             (Instr op (list (Reg 'rax) e2)))]
+       [(list (Global name) (Global name1)) (list (Instr 'movq (list e1 (Reg 'rax)))
+                                                  (Instr op (list (Reg 'rax) e2)))]
+       [(list (Deref a b) (Global name)) (list (Instr 'movq (list e1 (Reg 'rax)))
+                                               (Instr op (list (Reg 'rax) e2)))]
+       [(list x y) (list (Instr op (list e1 e2)))])]
     [(Instr op (list e1)) (list (Instr op (list e1)))]
-    [i (list i)]
-    ))
+    [i (list i)]))
 
 (define (patch-instructions-block px86block)
   (match px86block
@@ -1313,38 +1310,41 @@
           (label-name "conclusion") (+ 8 (align stacksize 16)) callee-reg-str-pop)) ;; stack-space
 
 (define (make-main stack-size root-spills)
-         (let* [push-bytes 40]
-               [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
+  (let* ([push-bytes 32]
+         [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
-      (append (list (Instr 'pushq (list (Reg 'rbp)))
-                    (Instr 'movq (list (Reg 'rsp) (Reg 'rbp))))
-              (map (lambda (x) (Instr 'pushq (list x))) (list (Reg 'rbx) (Reg 'r12) (Reg 'r13) (Reg 'r14) (Reg 'r15))) 
-              (list (Instr 'subq (list (Imm stack-adjust) (Reg 'rsp)))) 
-              (initialize-garbage-collector root-spills)
-              (list (Jmp 'start))))))
+           (append (list (Instr 'pushq (list (Reg 'rbp)))
+                         (Instr 'movq (list (Reg 'rsp) (Reg 'rbp))))
+                   (map (lambda (x) (Instr 'pushq (list x))) (list (Reg 'rbx) (Reg 'r12) (Reg 'r13) (Reg 'r14) #;(Reg 'r15))) 
+                   (list (Instr 'subq (list (Imm stack-adjust) (Reg 'rsp)))) 
+                   (initialize-garbage-collector root-spills)
+                   (list (Jmp 'start))))))
 
 (define (make-conclusion stack-size root-spills)
-         (let* [push-bytes 40]
-               [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
+  (let* ([push-bytes 32]
+         [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
-      (append (list (Instr 'subq (list (Imm (* 8 root-spills)) (Reg 'r15)))
-                    (Instr 'addq (list (Imm stack-adjust) (Reg 'rsp))))
-              (map (lambda (x) (Instr 'popq (list x))) (list (Reg 'r15) (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx))) 
-	      (list (Instr 'popq (list (Reg 'rbp)))
-                    (Retq)))))
+           (append (list (Instr 'subq (list (Imm (* 8 root-spills)) (Reg 'r15)))
+                         (Instr 'addq (list (Imm stack-adjust) (Reg 'rsp))))
+                   (map (lambda (x) (Instr 'popq (list x))) (list #;(Reg 'r15) (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx))) 
+                   (list (Instr 'popq (list (Reg 'rbp)))
+                         (Retq))))))
+
+(define root-stack-size 16384)
+(define heap-size 16)
 
 (define (initialize-garbage-collector root-spills)
   (append (list (Instr 'movq (list (Imm root-stack-size) (Reg 'rdi)))
                 (Instr 'movq (list (Imm heap-size) (Reg 'rsi)))
                 (Callq 'initialize)
                 (Instr 'movq (list (Global 'rootstack_begin) (Reg 'r15))))
-	  (for/list ([i root-spills]) (Instr 'movq (list (Imm 0) (Deref (Reg 'r15) (* i 8)))))
+	  (for/list ([i root-spills]) (Instr 'movq (list (Imm 0) (Deref 'r15 (* i 8)))))
 	  (list (Instr 'addq (list (Imm (* 8 root-spills)) (Reg 'r15))))))
 
 (define (stringify-arg arg)
   (match arg
     [(Global name)
-     (format "~a(%rip)" name)]
+     (format "~a(%rip)" (label-name name))]
     [(Imm n) (format "$~a" n)]
     [(Reg r) (format "%~a" r)]
     [(Deref r n) (format "~a(%~a)" n r)]))
@@ -1384,10 +1384,10 @@
     [(Callq lbl)
      (format "callq\t~a" (label-name lbl))]
     [(Retq) "retq"]
-    [(Instr 'pushq arg)
+    [(Instr 'pushq (list arg))
      (define st (stringify-arg arg))
      (format "pushq\t~a" st)]
-    [(Instr 'popq arg)
+    [(Instr 'popq (list arg))
      (define st (stringify-arg arg))
      (format "popq\t~a" st)]
     [(Jmp lbl)
@@ -1411,10 +1411,24 @@
      (format "~a"
              (foldr string-append ""
                     (for/list ([pair new-es])
-                      (string-append (if (equal? (car pair) 'main) (format "\t.globl ~a\n~a" (label-name 'main) (label-name 'main)) (label-name (car pair))) ":\n" (format-x86 (Block-instr* (cdr pair))))))
+                      (string-append (if (equal? (car pair) 'main) (format "\n\t.globl ~a\n~a" (label-name 'main) (label-name 'main)) (label-name (car pair))) ":\n" (format-x86 (Block-instr* (cdr pair))))))
              )]))
 
 (define r2_58prog (Program '() (If (Prim '<= (list (Int 2) (Int 2))) (Int 42) (Int 0))))
+
+(define testprinthw4 (print-x86
+                      (patch-instructions
+                       (allocate-registers
+                        (build-interference
+                         (uncover-live
+                          (select-instructions
+                           (uncover-locals
+                            (explicate-control
+                             (remove-complex-opera*
+                              (expose-allocation
+                               (uniquify
+                                (shrink
+                                 (type-check-R3 hw4prog))))))))))))))
 
 ;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (Program '() (Prim 'read (list)))))))))))))
 ;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program))))))))))

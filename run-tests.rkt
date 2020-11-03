@@ -59,7 +59,7 @@
      ("build interference" ,build-interference ,interp-pseudo-x86-2)
      ("allocate registers" ,allocate-registers ,interp-x86-2)
      ("patch instructions" ,patch-instructions ,interp-x86-2)
-     #;("print x86" ,print-x86 #f)
+     ("print x86" ,print-x86 #f)
      ))
 
 (define all-tests
@@ -77,5 +77,5 @@
         all-tests)))
 
 (interp-tests "r3" type-check-R3 r3-passes interp-R3 "r3" (tests-for "r3"))
-#;(compiler-tests "r3" type-check-R3 r3-passes "r3" (tests-for "r3"))
+(compiler-tests "r3" type-check-R3 r3-passes "r3" (tests-for "r3"))
 
