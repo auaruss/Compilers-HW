@@ -4,7 +4,8 @@
 (require "utilities.rkt")
 #;(require "interp-R1.rkt")
 #;(require "interp-R2.rkt")
-(require "interp-R3.rkt")
+#;(require "interp-R3.rkt")
+(require "interp-R4.rkt")
 #;(require "interp-C0.rkt")
 #;(require "interp-C1.rkt")
 #;(require "interp-C2.rkt")
@@ -44,7 +45,7 @@
      ("print x86" ,print-x86 #f)
      ))
 
-(define r3-passes
+#;(define r3-passes
   `(
      ("shrink" ,shrink ,interp-R3)
      ("uniquify" ,uniquify ,interp-R3)
@@ -62,6 +63,24 @@
      ("print x86" ,print-x86 #f)
      ))
 
+(define r4-passes
+  `(
+     #;("shrink" ,shrink ,interp-R3)
+     #;("uniquify" ,uniquify ,interp-R3)
+     #;("expose allocation" ,expose-allocation ,(let ([interp (new interp-R3-class)])
+                                                     (send interp interp-scheme '())))
+     #;("remove complex opera*" ,remove-complex-opera* ,(let ([interp (new interp-R3-class)])
+                                                             (send interp interp-scheme '())))
+     #;("explicate control" ,explicate-control ,interp-C2)
+     #;("uncover locals" ,uncover-locals ,interp-C2)
+     #;("instruction selection" ,select-instructions ,interp-pseudo-x86-2)
+     #;("uncover live" ,uncover-live ,interp-pseudo-x86-2)
+     #;("build interference" ,build-interference ,interp-pseudo-x86-2)
+     #;("allocate registers" ,allocate-registers ,interp-x86-2)
+     #;("patch instructions" ,patch-instructions ,interp-x86-2)
+     #;("print x86" ,print-x86 #f)
+     ))
+
 (define all-tests
   (map (lambda (p) (car (string-split (path->string p) ".")))
        (filter (lambda (p)
@@ -76,6 +95,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r3" type-check-R3 r3-passes interp-R3 "r3" (tests-for "r3"))
-(compiler-tests "r3" type-check-R3 r3-passes "r3" (tests-for "r3"))
+(interp-tests "r4" type-check-R4 r4-passes interp-R4 "r4" (tests-for "r4"))
+#;(compiler-tests "r3" type-check-R3 r3-passes "r3" (tests-for "r3"))
 

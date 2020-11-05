@@ -82,7 +82,7 @@
 (define hw4prog (Program '() hw4ex))
 
 
-;;Type-Check Pass: R2 -> R2
+;;Type-Check Pass: R4 -> R4
 
 (define (boolean-operator? op)
   (match op
@@ -100,13 +100,15 @@
     ['>= #t]
     [else #f]))
 
-(define (list-swap-element ts i t2 count)
-  (cond
-    [(null? ts) '()]
-    [(eq? i count) (cons t2 (list-swap-element (cdr ts) i t2 (add1 count)))]
-    [else (cons (car ts) (list-swap-element (cdr ts) i t2 (add1 count)))]
-    ))
+(define (fun-def-name d)
+  (match d 
+    [(Def f (list `[,xs : ,ps] ...) rt info body)
+     f]))
 
+(define (fun-def-type d)
+  (match d
+    [(Def f (list `[,xs : ,ps] ...) rt info body)
+     `(,@ps -> ,rt)]))
 
 (define (type-check-exp env)
   (lambda (e)
@@ -205,18 +207,40 @@
             (error "argument to an arithmetic operator must be an integer, not" Te2))
           (values (HasType (Prim op (list e1^ e2^)) 'Integer) 'Integer)])] 
       [(If e1 e2 e3)
-          (define-values (e1^ Te1) (recur e1))
-          (define-values (e2^ Te2) (recur e2))
-          (define-values (e3^ Te3) (recur e3))
-          (unless (equal? Te1 'Boolean)
-            (error "If condition must be a boolean, not" Te1))
-          (unless (equal? Te2 Te3)
-            (error "branches of an if statement must be the same type, not" Te2 'and Te3))
-	  (values (HasType (If e1^ e2^ e3^) Te2) Te2)]
+       (define-values (e1^ Te1) (recur e1))
+       (define-values (e2^ Te2) (recur e2))
+       (define-values (e3^ Te3) (recur e3))
+       (unless (equal? Te1 'Boolean)
+         (error "If condition must be a boolean, not" Te1))
+       (unless (equal? Te2 Te3)
+         (error "branches of an if statement must be the same type, not" Te2 'and Te3))
+       (values (HasType (If e1^ e2^ e3^) Te2) Te2)]
+      [(Apply e es)
+       (define-values (e^ ty) ((type-check-exp env) e))
+       (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
+                                 ((type-check-exp env) e)))
+       (match ty
+         [`(,ty^* ... -> ,rt)
+          (for ([arg-ty ty*] [prm-ty ty^*])
+          (unless (equal? arg-ty prm-ty)
+            (error "argument ~a not equal to parameter ~a" arg-ty prm-ty)))
+          (values (HasType (Apply e^ e*) rt) rt)]
+         [else (error "expected a function, not" ty)])]
       [else
         (error "type-check-exp couldn't match" e)])))
 
-(define (type-check env)
+(define (type-check-def env)
+  (lambda (e)
+    (match e
+      [(Def f (and p:t* (list `[,xs : ,ps] ...)) rt info body)
+       (define new-env (append (map cons xs ps) env))
+       (define-values (body^ ty^) ((type-check-exp new-env) body))
+       (unless (equal? ty^ rt)
+         (error "body type ~a not equal to return type ~a" ty^ rt))
+       (Def f p:t* rt info body^)])))
+
+;;type-check for R3 and before
+#;(define (type-check env)
   (lambda (e)
     (match e
       [(Program info body)
@@ -225,6 +249,26 @@
             (error "result of the program must be an integer, not" Tb))
           (Program info b^)]
 )))
+
+(define (type-check env)
+  (lambda (e)
+    (match e
+      [(ProgramDefsExp info ds body)
+       (define new-env (for/list ([d ds])
+                        (cons (fun-def-name d) (fun-def-type d))))
+       (define ds^ (for/list ([d ds])
+                             ((type-check-def new-env) d)))
+       (define-values (body^ ty) ((type-check-exp new-env) body))
+       (unless (equal? ty 'Integer)
+         (error "result of the program must be an integer, not " ty))
+       (ProgramDefsExp info ds^ body^)]
+      [else (error 'type-check "R4/type-check unmatched ~a" e)])))
+
+(define (type-check-R4 p)
+  (match p
+    [(ProgramDefsExp info ds body)
+     ((type-check '()) p)]
+    ))
 
 (define (type-check-R3 p)
   (match p
