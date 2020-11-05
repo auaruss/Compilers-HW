@@ -65,8 +65,8 @@
 
 (define r4-passes
   `(
-     #;("shrink" ,shrink ,interp-R3)
-     #;("uniquify" ,uniquify ,interp-R3)
+     ("shrink" ,shrink ,interp-R4)
+     ("uniquify" ,uniquify ,interp-R4)
      #;("expose allocation" ,expose-allocation ,(let ([interp (new interp-R3-class)])
                                                      (send interp interp-scheme '())))
      #;("remove complex opera*" ,remove-complex-opera* ,(let ([interp (new interp-R3-class)])

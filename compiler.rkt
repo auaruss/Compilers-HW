@@ -266,17 +266,20 @@
 
 (define (type-check-R4 p)
   (match p
+    [(Program info e)
+     (define new-p (ProgramDefsExp info '() e))
+     ((type-check '()) new-p)]
     [(ProgramDefsExp info ds body)
      ((type-check '()) p)]
     ))
 
-(define (type-check-R3 p)
+#;(define (type-check-R3 p)
   (match p
     [(Program info e)
      ((type-check '()) p)]
     ))
 
-(define (type-check-R2 p)
+#;(define (type-check-R2 p)
   (match p
     [(Program info e)
      ((type-check '()) p)]
@@ -295,6 +298,7 @@
                                                  (Prim 'vector-set! (list (Var 'v1) (Int 0) (Int 42)))
                                                  (Prim 'vector-set! (list (Var 'g1) (Int 0) (Int 42))))
 				      (Prim 'vector-ref (list (Var 'v1) (Int 0))))))))
+
 ;;(type-check-R3 r3_15)
 
 ;;Shrink Pass: R2 -> R2
@@ -324,8 +328,8 @@
 
 (define (shrink p)
   (match p
-    [(Program info e)
-     (Program info (shrink-exp e))]
+    [(ProgramDefsExp info ds e)
+     (ProgramDefs info (append ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
     ))
 
 (define r2p5 (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()) (Int 7))) (Prim 'read '())))))
@@ -372,11 +376,14 @@
 ;; uniquify : R1 -> R1
 (define (uniquify p)
   (match p
-    [(Program info e)
-     (Program info ((uniquify-exp (init-symbol-table)) e))]
+    [(ProgramDefs info ds)
+     (define new-ds (for/list ([d ds]) (match d
+				         [(Def label paramtypes returntype info e)
+					  (Def label paramtypes returntype info ((uniquify-exp (init-symbol-table)) e))])))
+     (ProgramDefs info new-ds)]
     ))
 
-(define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
+#;(define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
 
 
 
@@ -1460,7 +1467,7 @@
 
 (define r2_58prog (Program '() (If (Prim '<= (list (Int 2) (Int 2))) (Int 42) (Int 0))))
 
-(define testprinthw4 (print-x86
+#;(define testprinthw4 (print-x86
                       (patch-instructions
                        (allocate-registers
                         (build-interference
