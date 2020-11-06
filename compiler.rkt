@@ -416,7 +416,7 @@
           (for/list ([defn defns])
             (match defn
               [(Def label paramtypes returntype info e)
-                ((reveal-functions-exp functions-in-env) e)])))
+                (Def label paramtypes returntype info ((reveal-functions-exp functions-in-env) e))])))
       (ProgramDefs info revealed-definitions)])))
 
 #;(reveal-functions (uniquify (shrink (type-check-R4 r4p1))))
@@ -442,13 +442,17 @@
 
 (define (expose-allocation p)
   (match p
-      [(Program info e)
-       (Program info ((expose-allocation-exp '()) e))]))
+      [(ProgramDefs info ds)
+       (define new-ds (for/list ([d ds]) (match d
+                                           [(Def label paramtypes returntype info e)
+                                            (Def label paramtypes returntype info ((expose-allocation-exp '()) e))])))
+       (ProgramDefs info new-ds)]))
 
 (define (expose-allocation-exp env)
   (λ (e)
     (define recur (expose-allocation-exp env))
     (match e
+      [(FunRef f) (FunRef f)]
       [(Var x) (Var x)]
       [(Int n) (Int n)]
       [(Bool b) (Bool b)]
@@ -462,6 +466,7 @@
        (Prim op (map recur es))]
       [(If e1 e2 e3)
        (If (recur e1) (recur e2) (recur e3))]
+      [(Apply f arg*) (Apply (recur f) (map recur arg*))]
       [(HasType (Prim 'vector exps) type)
        (define i 0)
        (define bytes (* 8 (add1 (length exps))))
