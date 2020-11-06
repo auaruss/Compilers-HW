@@ -421,25 +421,49 @@
 
 #;(reveal-functions (uniquify (shrink (type-check-R4 r4p1))))
 
-#;(define limit-functions-exp
-  (λ (exp)
-    (match exp
-      [(Var x) ...]
-      [(Int n) ...]
-      [(Bool b) ...]
-	    [(Let x e body) ...]
-      [(Apply f arg*) ...]
-      [(Prim op es) ...]
-	    [(If e1 e2 e3) ...]
-	    [(HasType e t) ...])))
-
-
-#;(define limit-functions 
+(define limit-functions 
   (λ (p)
     (match p
-      [(ProgramDefs info ds)
-      ...])))
+      [(ProgramDefs info defns)
+       (define vectorized-definitions (map vectorize-definition defns))
+       (ProgramDefs info vectorized-definitions)])))
 
+(define vectorize-definition
+  (λ (d)
+    (match d
+      [(Def label paramtypes returntype info e)
+       (if (> (length paramtypes) 6)
+          (let ([vec (gensym 'vec)])  
+            (Def label (append (take 5 paramtypes)
+                                (list [vec : 
+                                      `(Vector ,(map cdr (drop 5 paramtypes)))]))
+                  returntype info (vectorize-expression e (map car (drop 5 paramtypes)) vec)))
+            d)])))
+
+(define vectorize-expression
+ (λ (e vars vecsym)
+  (define recur (λ (_) (vectorize-expression _ vars vecsym)))
+  (define indexed-vars
+    (foldr (λ (elem acc)
+             (if (empty? acc)
+               (list (cons elem 0))
+               (cons (cons elem (add1 (car (cdr (car acc))) acc)))))
+           '()
+           vars))
+  (match e
+    [(Var x)
+     (let ([maybe-index (dict-ref (Var x) vars (λ () #f))])
+      (if maybe-index
+          (Prim 'vector-ref (list vec (Int maybe-index)))
+          (Var x)))]
+    [(Int n) (Int n)]
+    [(Bool b) (Bool b)]
+    [(Let x e body) (Let x (recur e) (recur body))]
+    [(Apply f arg*) (Apply (recur f) (map recur arg*))]
+    [(Prim op es) (Prim op (map recur es))]
+    [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
+    [(HasType e t) (HasType (recur e) t)])))
+    
 (define (expose-allocation p)
   (match p
       [(ProgramDefs info ds)
