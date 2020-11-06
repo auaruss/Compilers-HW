@@ -402,7 +402,58 @@
 (define r4p1 (ProgramDefsExp '() (list (Def 'id '([x : Integer]) 'Integer '() (Var 'x))) (Apply (Var 'id) (list (Int 42)))))
 #;(uniquify (shrink (type-check-R4 r4p1)))
 
+(define reveal-functions-exp
+  (λ (functions)
+    (λ (exp)
+      (define recur (reveal-functions-exp functions))
+      (match exp
+        [(Var x)
+         (if (set-member? functions x)
+             (FunRef x)
+             (Var x))]
+        [(Int n) (Int n)]
+        [(Bool b) (Bool b)]
+        [(Let x e body)
+         (define recur-with-let-overshadowing (reveal-functions-exp (set-remove functions x)))
+         (Let x
+              (recur-with-let-overshadowing e)
+              (recur-with-let-overshadowing body))]
+        [(Apply f arg*) (Apply (recur f) (map recur arg*))]
+        [(Prim op es) (Prim op (map recur es))]
+        [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
+        [(HasType e t) (HasType (recur e) t)]))))
 
+
+(define reveal-functions 
+  (λ (p)
+    (match p
+      [(ProgramDefs info defns)
+       (define functions-in-env (list->set (map Def-name defns)))
+       (define revealed-definitions
+          (for/list ([defn defns])
+            (match defn
+              [(Def label paramtypes returntype info e)
+                ((reveal-functions-exp functions-in-env) e)])))
+      (ProgramDefs info revealed-definitions)])))
+
+#;(define limit-functions-exp
+  (λ (exp)
+    (match exp
+      [(Var x) ...]
+      [(Int n) ...]
+      [(Bool b) ...]
+	    [(Let x e body) ...]
+      [(Apply f arg*) ...]
+      [(Prim op es) ...]
+	    [(If e1 e2 e3) ...]
+	    [(HasType e t) ...])))
+
+
+#;(define limit-functions 
+  (λ (p)
+    (match p
+      [(ProgramDefs info ds)
+      ...])))
 
 (define (expose-allocation p)
   (match p
