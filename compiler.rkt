@@ -396,7 +396,11 @@
              (Var x))]
         [(Int n) (Int n)]
         [(Bool b) (Bool b)]
-        [(Let x e body) (Let x (recur e) (recur body))]
+        [(Let x e body)
+         (define recur-with-let-overshadowing (reveal-functions-exp (set-remove functions x)))
+         (Let x
+              (recur-with-let-overshadowing e)
+              (recur-with-let-overshadowing body))]
         [(Apply f arg*) (Apply (recur f) (map recur arg*))]
         [(Prim op es) (Prim op (map recur es))]
         [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
