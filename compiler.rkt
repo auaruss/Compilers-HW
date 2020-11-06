@@ -64,9 +64,11 @@
   (assert "testing pe-R0"
      (equal? (interp-R0 p) (interp-R0 (pe-R0 p)))))
 
+#|
 (test-pe (parse-program `(program () (+ 10 (- (+ 5 3))))))
 (test-pe (parse-program `(program () (+ 1 (+ 3 1)))))
 (test-pe (parse-program `(program () (- (+ 3 (- 5))))))
+|#
 
 ;; example program from lecture:
 #;(let ([v (vector 42)])
@@ -285,23 +287,8 @@
      ((type-check '()) p)]
     ))
 
-(define r2p1 (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
-(define r2p2 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Int 6)) (Prim 'read '())))))
-(define r2p3 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Int 7) (Bool #t)) (Prim 'read '())))))
-(define r2p4 (Program '() (Prim '+ (list (If (Prim 'not (list (Bool #f))) (Bool #f) (Bool #t)) (Prim 'read '())))))
-(define r3_1 (Program '() (Let 'v (Prim 'vector (list (Int 1) (Int 2))) (Int 42))))
-(define r3_2 (Program '() (Let 'v (Prim 'vector (list (Int 20) (Int 22))) (Prim '+ (list (Prim 'vector-ref (list (Var 'v) (Int 0))) (Prim 'vector-ref (list (Var 'v) (Int 1))))))))
-(define r3_15 (Program '() 
-		       (Let 'v1 (Prim 'vector (list (Int 0))) 
-			    (Let 'g1 (Prim 'vector (list (Int 1) (Int 2) (Int 3) (Int 4) (Int 5)))
-				 (Let 'dummy (If (Prim 'eq? (list (Prim 'read '()) (Int 0)))
-                                                 (Prim 'vector-set! (list (Var 'v1) (Int 0) (Int 42)))
-                                                 (Prim 'vector-set! (list (Var 'g1) (Int 0) (Int 42))))
-				      (Prim 'vector-ref (list (Var 'v1) (Int 0))))))))
 
-;;(type-check-R3 r3_15)
-
-;;Shrink Pass: R2 -> R2
+;;Shrink Pass: R4 -> R4
 (define (shrink-exp e)
   (match e
     [(HasType (Prim '- (list e1 e2)) 'Integer) 
@@ -332,11 +319,8 @@
      (ProgramDefs info (append ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
     ))
 
-(define r2p5 (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()) (Int 7))) (Prim 'read '())))))
-(define r2p6 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '<= (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
-(define r2p7 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '> (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
-(define r2p8 (Program '() (Prim '+ (list (If (Prim 'and (list (Prim 'not (list (Bool #f))) (Prim 'or (list (Prim '<= (list (Int 7) (Int 8))) (Bool #f))))) (Int 7) (Int 6)) (Prim 'read '())))))
 
+;;Uniquify Pass: R4 -> R4
 (define uniquify-exp
   (λ (symtab)
     (λ (exp)
@@ -400,7 +384,6 @@
 
 #;(define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
 (define r4p1 (ProgramDefsExp '() (list (Def 'id '([x : Integer]) 'Integer '() (Var 'x))) (Apply (Var 'id) (list (Int 42)))))
-#;(uniquify (shrink (type-check-R4 r4p1)))
 
 (define reveal-functions-exp
   (λ (functions)
@@ -435,6 +418,8 @@
               [(Def label paramtypes returntype info e)
                 ((reveal-functions-exp functions-in-env) e)])))
       (ProgramDefs info revealed-definitions)])))
+
+#;(reveal-functions (uniquify (shrink (type-check-R4 r4p1))))
 
 #;(define limit-functions-exp
   (λ (exp)

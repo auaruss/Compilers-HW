@@ -63,10 +63,16 @@
      ("print x86" ,print-x86 #f)
      ))
 
+(define interp-F1 
+  (lambda (p)
+    ((send (new interp-R4-class)
+	   interp-F '()) p)))
+
 (define r4-passes
   `(
      ("shrink" ,shrink ,interp-R4)
      ("uniquify" ,uniquify ,interp-R4)
+     ("reveal functions" ,reveal-functions ,interp-F1)
      #;("expose allocation" ,expose-allocation ,(let ([interp (new interp-R3-class)])
                                                      (send interp interp-scheme '())))
      #;("remove complex opera*" ,remove-complex-opera* ,(let ([interp (new interp-R3-class)])
