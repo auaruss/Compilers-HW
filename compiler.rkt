@@ -354,6 +354,11 @@
          (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]
 	[(If e1 e2 e3)
 	 (If ((uniquify-exp symtab) e1) ((uniquify-exp symtab) e2) ((uniquify-exp symtab) e3) )]
+        [(Apply e es)
+         (define e^ ((uniquify-exp symtab) e))
+         (define e* (for/list ([e (in-list es)])
+                                   ((uniquify-exp symtab) e)))
+         (Apply e^ e*)]
 	[(HasType e t)
 	 (HasType ((uniquify-exp symtab) e) t)]))))
 
@@ -364,26 +369,38 @@
 
 (define symbol-table-lookup
   (λ (symtab x)
-    (if (empty? (hash-ref symtab x)) (error "variable not in scope") (car (hash-ref symtab x)))))
+    (if (empty? (hash-ref symtab x)) (error "variable not in scope") (hash-ref symtab x)#;(car (hash-ref symtab x)))))
 
 (define extend-symbol-table
   (λ (symtab x new-x)
     (hash-set symtab
               x
-              (let [(not-found (λ () '()))]
+              new-x
+              #;(let [(not-found (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
 ;; uniquify : R1 -> R1
 (define (uniquify p)
   (match p
     [(ProgramDefs info ds)
+     (define new-alist (for/list ([d ds]) (match (Def-name d)
+                                             ['main (cons 'main 'main)]
+                                             [name (cons name (gensym name))])))
      (define new-ds (for/list ([d ds]) (match d
 				         [(Def label paramtypes returntype info e)
-					  (Def label paramtypes returntype info ((uniquify-exp (init-symbol-table)) e))])))
+                                          (define new-alist^ (for/list ([t paramtypes]) (match (car t)
+                                                                                          [v (cons v (gensym v))])))
+                                          (define new-paramtypes (for/list ([t paramtypes]) (match t
+                                                                                              [`(,v : ,type)
+                                                                                               `(,(dict-ref new-alist^ v) : ,type)])))
+                                          (define combined-alist (append new-alist new-alist^))
+					  (Def (dict-ref new-alist label) new-paramtypes returntype info ((uniquify-exp (make-immutable-hash combined-alist)) e))])))
      (ProgramDefs info new-ds)]
     ))
 
 #;(define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
+(define r4p1 (ProgramDefsExp '() (list (Def 'id '([x : Integer]) 'Integer '() (Var 'x))) (Apply (Var 'id) (list (Int 42)))))
+#;(uniquify (shrink (type-check-R4 r4p1)))
 
 
 
