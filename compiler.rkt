@@ -689,10 +689,10 @@
     ))
 
 
-; explicate-tail : R1 -> C0Tail x [Var]
-; takes in R1 expression and produces C0 Tail and list of let-bound variables
-(define (explicate-tail r2exp)
-  (match r2exp
+; explicate-tail : R4 -> C3Tail x [Var]
+; takes in R4 expression and produces C3 Tail and list of let-bound variables
+define (explicate-tail r4exp)
+  (match r4exp
     [(Int n)
      (values (Return (Int n)) '())]
     [(Bool b)
@@ -719,14 +719,14 @@
     ))
 
 
-; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
-; takes in R1 expression, the variable where it will be assigned, and a C0Tail that comes
-; after the assignment. Returns a C0Tail and list of variables
+; explicate-assign : R4 Var C3Tail -> C3Tail x [Var]
+; takes in R4 expression, the variable where it will be assigned, and a C3Tail that comes
+; after the assignment. Returns a C3Tail and list of variables
 
 ;; simplify
 
-(define (explicate-assign r2exp v c)
-  (match r2exp
+(define (explicate-assign r4exp v c)
+  (match r4exp
     [(Void)
      (values (Seq (Assign v (Void)) c) '())]
     [(Collect n)
@@ -770,9 +770,9 @@
      ]
     ))
 
-;; explicate-pred : R2_exp x C1_tail x C1_tail -> C1_tail x var list
-(define (explicate-pred r2exp c1 c2)
-  (match r2exp
+;; explicate-pred : R4_exp x C3_tail x C3_tail -> C3_tail x var list
+(define (explicate-pred r4exp c1 c2)
+  (match r4exp
     [(Bool b)
      (values (if b c1 c2) '())]
     [(Var v)
@@ -784,7 +784,7 @@
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
-     (values (IfStmt (Prim 'eq? (list r2exp (Bool #t))) (Goto label1) (Goto label2))
+     (values (IfStmt (Prim 'eq? (list r4exp (Bool #t))) (Goto label1) (Goto label2))
              '())]
     [(Prim op ls)
      (define label1 (gensym 'block))
@@ -795,7 +795,7 @@
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
-     (values (IfStmt r2exp (Goto label1) (Goto label2))
+     (values (IfStmt r4exp (Goto label1) (Goto label2))
              '())] 
     [(Let x e body)
      (define label1 (gensym 'block))
@@ -828,7 +828,7 @@
      (explicate-pred e c1 c2)]
      ))
 
-;; explicate-control : R1 -> C0
+;; explicate-control : R4 -> C3
 (define (explicate-control p)
   (match p
     [(Program info e)
