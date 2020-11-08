@@ -609,6 +609,8 @@
 ; takes in R1 expression and produces C0 Tail and list of let-bound variables
 (define (explicate-tail r2exp)
   (match r2exp
+    [(FunRef v) ...]
+    [(Apply e es) ...]
     [(Int n)
      (values (Return (Int n)) '())]
     [(Bool b)
@@ -643,6 +645,8 @@
 
 (define (explicate-assign r2exp v c)
   (match r2exp
+    [(FunRef v) ...]
+    [(Apply e es) ...]
     [(Void)
      (values (Seq (Assign v (Void)) c) '())]
     [(Collect n)
@@ -689,6 +693,8 @@
 ;; explicate-pred : R2_exp x C1_tail x C1_tail -> C1_tail x var list
 (define (explicate-pred r2exp c1 c2)
   (match r2exp
+    [(FunRef v) (FunRef v)]
+    [(Apply e es) (Call atm atm)]
     [(Bool b)
      (values (if b c1 c2) '())]
     [(Var v)
@@ -743,6 +749,9 @@
     [(HasType e t)
      (explicate-pred e c1 c2)]
      ))
+
+;; need to change this to work with the ProgramDefs
+;; (ProgramDefs info (def... (Def 'main '() 'Integer '() exp)))
 
 ;; explicate-control : R1 -> C0
 (define (explicate-control p)
