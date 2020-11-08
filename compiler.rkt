@@ -14,6 +14,7 @@
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
 (define-vertex-property globalCFG live-before-set)
+(define-vertex-property globalCFG label)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -691,7 +692,7 @@
 
 ; explicate-tail : R4 -> C3Tail x [Var]
 ; takes in R4 expression and produces C3 Tail and list of let-bound variables
-define (explicate-tail r4exp)
+define (explicate-tail r4exp funlabel)
   (match r4exp
     [(Int n)
      (values (Return (Int n)) '())]
@@ -725,7 +726,7 @@ define (explicate-tail r4exp)
 
 ;; simplify
 
-(define (explicate-assign r4exp v c)
+(define (explicate-assign r4exp v c funlabel)
   (match r4exp
     [(Void)
      (values (Seq (Assign v (Void)) c) '())]
@@ -771,7 +772,7 @@ define (explicate-tail r4exp)
     ))
 
 ;; explicate-pred : R4_exp x C3_tail x C3_tail -> C3_tail x var list
-(define (explicate-pred r4exp c1 c2)
+(define (explicate-pred r4exp c1 c2 funlabel)
   (match r4exp
     [(Bool b)
      (values (if b c1 c2) '())]
@@ -831,13 +832,19 @@ define (explicate-tail r4exp)
 ;; explicate-control : R4 -> C3
 (define (explicate-control p)
   (match p
-    [(Program info e)
-     (define-values (c0t let-binds) (explicate-tail e))
-     (add-vertex! globalCFG 'start)
-     (instructions-set! 'start c0t)
-     (live-before-set-set! 'start (set))
+    [(ProgramDefs info ds)
+     (define localvars '())
+     (define new-ds (for/list ([d ds]) (match d
+                                         [(Def label paramtypes returntype info e)
+                                          (define new-label (string->symbol (string-append (symbol->string label) "start")))
+                                          (define-values (c3t let-binds blocklist) (explicate-tail e label))
+                                          (add-vertex! globalCFG new-label)
+                                          (instructions-set! new-label c3t)
+                                          (live-before-set-set! new-label (set))
+                                          (set! localvars (append (localvars) (let-binds)))
+                                          ])))
      (define labeled-instruction-lists (for/list ([l (get-vertices globalCFG)]) (cons l (instructions l))))
-     (Program (cons (cons 'locals let-binds) info) (CFG labeled-instruction-lists))]))
+     (ProgramDefs (cons (cons 'locals localvars) info) new-ds)]))
 
 (define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
 (define r1program-let (Program '() given-let))
