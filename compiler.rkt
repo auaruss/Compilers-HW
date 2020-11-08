@@ -416,39 +416,108 @@
           (for/list ([defn defns])
             (match defn
               [(Def label paramtypes returntype info e)
-                ((reveal-functions-exp functions-in-env) e)])))
+                (Def label paramtypes returntype info ((reveal-functions-exp functions-in-env) e))])))
       (ProgramDefs info revealed-definitions)])))
 
-#;(reveal-functions (uniquify (shrink (type-check-R4 r4p1))))
-
-#;(define limit-functions-exp
-  (λ (exp)
-    (match exp
-      [(Var x) ...]
-      [(Int n) ...]
-      [(Bool b) ...]
-	    [(Let x e body) ...]
-      [(Apply f arg*) ...]
-      [(Prim op es) ...]
-	    [(If e1 e2 e3) ...]
-	    [(HasType e t) ...])))
-
-
-#;(define limit-functions 
+(define limit-functions 
   (λ (p)
     (match p
-      [(ProgramDefs info ds)
-      ...])))
+      [(ProgramDefs info defns)
+       (define vectorized-definitions (map vectorize-definition defns))
+       (ProgramDefs info vectorized-definitions)])))
 
+(define vectorize-definition
+  (λ (d)
+    (match d
+      [(Def label paramtypes returntype info e)
+       (if (> (length paramtypes) 6)
+          (let ([vec (gensym 'vec)])  
+            (Def label (append (take paramtypes 5)
+                                (list `[,vec : 
+                                       ,(cons 'Vector (map caddr (drop paramtypes 5)))]))
+                  returntype info (vectorize-expression e (map car (drop paramtypes 5)) vec (cons 'Vector (map caddr (drop paramtypes 5))))))
+            (Def label paramtypes returntype info (vectorize-expression2 e)))])))
+
+(define vectorize-expression2
+ (λ (e)
+  (define recur (λ (_) (vectorize-expression2 _)))
+  (define i 0)
+  (match e
+    [(Var x) (Var x)]
+    [(Int n) (Int n)]
+    [(Bool b) (Bool b)]
+    [(Let x e body) (Let x (recur e) (recur body))]
+    [(Apply f arg*)
+     (define type-list (for/list ([e arg*])
+                         (match e
+                           [(HasType e^ t) t])))
+     (if (> (length arg*) 6)
+         (Apply (recur f) (append (map recur (take arg* 5)) (list (recur (HasType (Prim 'vector (drop arg* 5)) `(Vector ,@(drop type-list 5)))))))
+         (Apply (recur f) (map recur arg*)))]
+    [(Prim op es) (Prim op (map recur es))]
+    [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
+    [(HasType (FunRef x) t)
+     (define new-t (match (take t (- (length t) 2))
+                     [`(,ts ...)
+                      (if (> (length ts) 6)
+                          (append (take ts 5) (list `(Vector ,@(drop ts 5))) (drop t (- (length t) 2)))
+                          t)]))
+     (HasType (FunRef x) new-t)]
+    [(HasType e t) (HasType (recur e) t)])))
+
+(define vectorize-expression
+ (λ (e vars vecsym vecsym-type)
+  (define recur (λ (_) (vectorize-expression _ vars vecsym vecsym-type)))
+  (define i 0)
+  (define indexed-vars (map (λ (v) (begin (set! i (add1 i))
+                                   (cons v (sub1 i)))) vars))
+  (match e
+    [(Var x)
+     (let ([maybe-index (dict-ref indexed-vars x (λ () #f))])
+      (if maybe-index
+          (Prim 'vector-ref (list (HasType (Var vecsym) vecsym-type) (HasType (Int maybe-index) 'Integer)))
+          (Var x)))]
+    [(HasType (FunRef x) t)
+     (define new-t (match (take t (- (length t) 2))
+                     [`(,ts ...)
+                      (if (> (length ts) 6)
+                          (append (take ts 5) (list `(Vector ,@(drop ts 5))) (drop t (- (length t) 2)))
+                          t)]))
+     (HasType (FunRef x) new-t)]
+    [(Int n) (Int n)]
+    [(Bool b) (Bool b)]
+    [(Let x e body) (Let x (recur e) (recur body))]
+    [(Apply f arg*)
+     (define type-list (for/list ([e arg*])
+                         (match e
+                           [(HasType e^ t) t])))
+     (if (> (length arg*) 6)
+         (Apply (recur f) (append (map recur (take arg* 5)) (list (recur (HasType (Prim 'vector (drop arg* 5)) `(Vector ,@(drop type-list arg*)))))))
+         (Apply (recur f) (map recur arg*)))]
+    [(Prim op es) (Prim op (map recur es))]
+    [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
+    [(HasType e t) (HasType (recur e) t)])))
+
+(define r4p02 (parse-program `(program '() (define (add8  [a : Integer] [b : Integer] [c : Integer] [d : Integer] [e : Integer] [f : Integer] [g : Integer] [h : Integer]) : Integer
+   (+ a (+ b (+ c (+ d (+ e (+ f (+ g h))))))))
+(add8 0 1 1 1 1 1 1 35)
+)))
+#;(limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))
+
+;;Expose Allocation: F1 -> F1 
 (define (expose-allocation p)
   (match p
-      [(Program info e)
-       (Program info ((expose-allocation-exp '()) e))]))
+      [(ProgramDefs info ds)
+       (define new-ds (for/list ([d ds]) (match d
+                                           [(Def label paramtypes returntype info e)
+                                            (Def label paramtypes returntype info ((expose-allocation-exp '()) e))])))
+       (ProgramDefs info new-ds)]))
 
 (define (expose-allocation-exp env)
   (λ (e)
     (define recur (expose-allocation-exp env))
     (match e
+      [(FunRef f) (FunRef f)]
       [(Var x) (Var x)]
       [(Int n) (Int n)]
       [(Bool b) (Bool b)]
@@ -462,6 +531,7 @@
        (Prim op (map recur es))]
       [(If e1 e2 e3)
        (If (recur e1) (recur e2) (recur e3))]
+      [(Apply f arg*) (Apply (recur f) (map recur arg*))]
       [(HasType (Prim 'vector exps) type)
        (define i 0)
        (define bytes (* 8 (add1 (length exps))))
@@ -515,15 +585,15 @@
        (HasType (recur e) t)]
       [(Void) (Void)])))
 
-(define q (Program '() (Let 'v (Prim 'vector (list (Int 1) (Int 2))) (Prim 'vector-ref (list (Var 'v) (Int 0))))))
 
-#;(expose-allocation (uniquify (shrink (type-check-R3 q))))
-
-;; remove-complex-opera* : R1 -> R1
+;; remove-complex-opera* : F1 -> F1
 (define (remove-complex-opera* p)
     (match p
-      [(Program info e)
-       (Program info (rco-exp e))]))
+      [(ProgramDefs info ds)
+       (define new-ds (for/list ([d ds]) (match d
+                                           [(Def label paramtypes returntype info e)
+                                            (Def label paramtypes returntype info (rco-exp e))])))
+       (ProgramDefs info new-ds)]))
 
 ;; rco-atom : exp -> exp * (var * exp) list
 (define (rco-atom e)
@@ -563,6 +633,18 @@
      (define tmp (gensym 'tmp))
      (values (HasType (Var tmp) t)
              `((,tmp . ,(HasType (Allocate n t) t))))]
+    [(HasType (FunRef name) t)
+     (define tmp (gensym 'tmp))
+     (values (HasType (Var tmp) t)
+             `((,tmp . ,(HasType (FunRef name) t))))]
+    [(HasType (Apply f es) t)
+     (define-values (new-es sss)
+       (for/lists (l1 l2) ([e es]) (rco-atom e)))
+     (define-values (new-f ssf) (rco-atom f))
+     (define ss (append* ssf sss))
+     (define tmp (gensym 'tmp))
+     (values (HasType (Var tmp) t)
+             (append ss `((,tmp . ,(HasType (Apply new-f new-es) t)))))]
     [(HasType e t)
      (define-values (new-e ss) (rco-atom e))
      (values (HasType new-e t) ss)]
@@ -581,12 +663,18 @@
     [(Var x) (Var x)]
     [(Int n) (Int n)]
     [(Bool b) (Bool b)]
+    [(FunRef x) (FunRef x)]
     [(Let x rhs body)
      (Let x (rco-exp rhs) (rco-exp body))]
     [(HasType (Prim op es) t)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (make-lets^ (append* sss) (HasType (Prim op new-es) t))]
+    [(HasType (Apply f es) t)
+     (define-values (new-es sss)
+       (for/lists (l1 l2) ([e es]) (rco-atom e)))
+     (define new-f (rco-exp f))
+     (make-lets^ (append* sss) (HasType (Apply new-f new-es) t))]
     [(If e1 e2 e3)
      (define new-es
        (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
@@ -601,16 +689,10 @@
     ))
 
 
-(define rp (Program '() (Prim '+ (list (Prim '- (list (Prim 'read '()))) (Prim 'read '())))))
-
-;;(interp-R2 (remove-complex-opera* (uniquify (shrink ((type-check-R2 '()) r2p8)))))
-
-; explicate-tail : R1 -> C0Tail x [Var]
-; takes in R1 expression and produces C0 Tail and list of let-bound variables
-(define (explicate-tail r2exp)
-  (match r2exp
-    [(FunRef v) ...]
-    [(Apply e es) ...]
+; explicate-tail : R4 -> C3Tail x [Var]
+; takes in R4 expression and produces C3 Tail and list of let-bound variables
+define (explicate-tail r4exp)
+  (match r4exp
     [(Int n)
      (values (Return (Int n)) '())]
     [(Bool b)
@@ -637,16 +719,14 @@
     ))
 
 
-; explicate-assign : R1 Var C0Tail -> C0Tail x [Var]
-; takes in R1 expression, the variable where it will be assigned, and a C0Tail that comes
-; after the assignment. Returns a C0Tail and list of variables
+; explicate-assign : R4 Var C3Tail -> C3Tail x [Var]
+; takes in R4 expression, the variable where it will be assigned, and a C3Tail that comes
+; after the assignment. Returns a C3Tail and list of variables
 
 ;; simplify
 
-(define (explicate-assign r2exp v c)
-  (match r2exp
-    [(FunRef v) ...]
-    [(Apply e es) ...]
+(define (explicate-assign r4exp v c)
+  (match r4exp
     [(Void)
      (values (Seq (Assign v (Void)) c) '())]
     [(Collect n)
@@ -690,11 +770,9 @@
      ]
     ))
 
-;; explicate-pred : R2_exp x C1_tail x C1_tail -> C1_tail x var list
-(define (explicate-pred r2exp c1 c2)
-  (match r2exp
-    [(FunRef v) (FunRef v)]
-    [(Apply e es) (Call atm atm)]
+;; explicate-pred : R4_exp x C3_tail x C3_tail -> C3_tail x var list
+(define (explicate-pred r4exp c1 c2)
+  (match r4exp
     [(Bool b)
      (values (if b c1 c2) '())]
     [(Var v)
@@ -706,7 +784,7 @@
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
-     (values (IfStmt (Prim 'eq? (list r2exp (Bool #t))) (Goto label1) (Goto label2))
+     (values (IfStmt (Prim 'eq? (list r4exp (Bool #t))) (Goto label1) (Goto label2))
              '())]
     [(Prim op ls)
      (define label1 (gensym 'block))
@@ -717,7 +795,7 @@
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
-     (values (IfStmt r2exp (Goto label1) (Goto label2))
+     (values (IfStmt r4exp (Goto label1) (Goto label2))
              '())] 
     [(Let x e body)
      (define label1 (gensym 'block))
@@ -750,10 +828,7 @@
      (explicate-pred e c1 c2)]
      ))
 
-;; need to change this to work with the ProgramDefs
-;; (ProgramDefs info (def... (Def 'main '() 'Integer '() exp)))
-
-;; explicate-control : R1 -> C0
+;; explicate-control : R4 -> C3
 (define (explicate-control p)
   (match p
     [(Program info e)
