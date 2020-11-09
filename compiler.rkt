@@ -311,13 +311,19 @@
      (HasType (Prim op (list (shrink-exp e1) (shrink-exp e2))) type)]
     [(HasType (If e1 e2 e3) type)
      (HasType (If (shrink-exp e1) (shrink-exp e2) (shrink-exp e3)) type)]
+    [(HasType (Apply fs es) type)
+     (define new-es (for/list ([e es]) (shrink-exp e)))
+     (HasType (Apply (shrink-exp fs) new-es) type)]
     [else e]
     ))
 
 (define (shrink p)
   (match p
     [(ProgramDefsExp info ds e)
-     (ProgramDefs info (append ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
+     (define new-ds (for/list ([d ds]) (match d
+                                         [(Def f paramtypes rt info body)
+                                          (Def f paramtypes rt info (shrink-exp body))])))
+     (ProgramDefs info (append new-ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
     ))
 
 
@@ -1131,6 +1137,18 @@
                                                (dict-set info 'num-params (length paramtypes))
                                                new-alist)])))
      (ProgramDefs info new-ds)]))
+
+
+(define jeremytest (parse-program `(program '() (define (tail-sum  [n : Integer] [r : Integer]) : Integer
+   (if (eq? n 0)
+      r
+      (tail-sum (- n 1) (+ n r))
+   )
+)
+(+ (tail-sum 5 0) 27))))
+
+#;(printf "~a" (shrink (type-check-R4 jeremytest)))
+#;(select-instructions (uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 jeremytest))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
