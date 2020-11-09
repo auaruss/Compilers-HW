@@ -9,12 +9,21 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'concrete-syntax)
+(AST-output-syntax 'abstract-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
 (define-vertex-property globalCFG live-before-set)
 (define-vertex-property globalCFG function-label)
+
+(define r4_01 (parse-program `(program '()  (define (map-vec [f : (Integer -> Integer)]
+                                                             [v : (Vector Integer Integer)])
+                                              : (Vector Integer Integer)
+                                              (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
+                                       (define (add1 [x : Integer]) : Integer
+                                         (+ x 1))
+                                       (vector-ref (map-vec add1 (vector 0 41)) 1))))
+;;(define r4_01prog (ProgramDefsExp '() r4_01))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -993,6 +1002,17 @@
          [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
          [res (bitwise-ior type-num type-len)])
     res))
+
+(define uptosel-ins
+  (uncover-locals
+   (explicate-control
+    (remove-complex-opera*
+     (expose-allocation
+      (limit-functions
+       (reveal-functions
+        (uniquify
+         (shrink
+          (type-check-R4 r4_01))))))))))
 
 ;; argument registers in order:
 (define ARGREGS '(rdi rsi rdx rcx r8 r9))

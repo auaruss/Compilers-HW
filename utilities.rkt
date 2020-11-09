@@ -1353,6 +1353,7 @@ Changelog:
 (define no-default (gensym))
 
 (define (lookup x ls [default no-default])
+  ;(printf "we're looking for ~a and is it a symbol? : ~a running assoc : ~a\n" x (symbol? x) (assoc x ls))
   (let recur ([xs ls])
     (cond
       [(null? xs)
