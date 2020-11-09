@@ -80,7 +80,7 @@
      ("uncover locals" ,uncover-locals ,interp-C3)
      ("instruction selection" ,select-instructions ,interp-pseudo-x86-3)
      ("uncover live" ,uncover-live ,interp-pseudo-x86-3)
-     #;("build interference" ,build-interference ,interp-pseudo-x86-2)
+     ("build interference" ,build-interference ,interp-pseudo-x86-3)
      #;("allocate registers" ,allocate-registers ,interp-x86-2)
      #;("patch instructions" ,patch-instructions ,interp-x86-2)
      #;("print x86" ,print-x86 #f)
