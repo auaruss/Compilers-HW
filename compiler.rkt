@@ -1054,17 +1054,18 @@
 ; sel-ins-tail : C1tail -> pseudo-x86
 ; takes in a c1 tail and converts it ot pseudo-x86
 
-(define (sel-ins-tail c0t)
+(define (sel-ins-tail c0t name)
   (match c0t
     [(TailCall fun args) (append (assign-arg-regs args 0)
                                  (list (TailJmp (sel-ins-atm fun))))]
-    [(HasType tail type) (sel-ins-tail tail)]
+    [(HasType tail type) (sel-ins-tail tail name)]
     [(Return e)
-     (append (sel-ins-stmt (Assign (Reg 'rax) e))
-             (list (Jmp 'conclusion)))]
+     (let ([conc (string->symbol (string-append (symbol->string name) "conclusion"))])
+       (append (sel-ins-stmt (Assign (Reg 'rax) e))
+               (list (Jmp conc))))]
     [(Seq stmt tail)
      (define x86stmt (sel-ins-stmt stmt))
-     (define x86tail (sel-ins-tail tail))
+     (define x86tail (sel-ins-tail tail name))
      (append x86stmt x86tail)]
     [(Goto label)
      (list (Jmp label)) ]
@@ -1096,12 +1097,12 @@
     [(ProgramDefs info ds)
      (define new-ds (for/list ([d ds]) (match d
                                          [(Def label paramtypes returntype info alist)
-                                          (define new-alist (for/list ([p alist]) (cons (car p) (sel-ins-tail (cdr p)))))
-                                          (Def label paramtypes returntype info new-alist)])))
-     (ProgramDefs info new-ds)])
-  #;(match p
-    [(Program info (CFG es))
-     (Program info (CFG (for/list ([ls es]) (cons (car ls) (Block '() (sel-ins-tail (cdr ls)))))))]))
+                                          (define new-alist (for/list ([p alist])
+                                                              (cons (car p) (Block '() (sel-ins-tail (cdr p) label)))))
+                                          (Def label paramtypes returntype
+                                               (dict-set info 'num-params (length paramtypes))
+                                               new-alist)])))
+     (ProgramDefs info new-ds)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
