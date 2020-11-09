@@ -991,7 +991,7 @@
          (match e
            [(FunRef lbl) (list (Instr 'leaq (list (FunRef lbl) v)))] ;; think this is right
            [(Call fun args) (append (assign-arg-regs args 0)
-                                    (list (IndirectCallq fun) 
+                                    (list (IndirectCallq (sel-ins-atm fun)) 
                                           (Instr 'movq (list (Reg 'rax) v))))]
            [(HasType e^ t) (sel-ins-stmt (Assign v e^))]
            [(Allocate len T)
@@ -1054,7 +1054,7 @@
 (define (sel-ins-tail c0t)
   (match c0t
     [(TailCall fun args) (append (assign-arg-regs args 0)
-                                 (list (TailJmp fun)))]
+                                 (list (TailJmp (sel-ins-atm fun))))]
     [(HasType tail type) (sel-ins-tail tail)]
     [(Return e)
      (append (sel-ins-stmt (Assign (Reg 'rax) e))
