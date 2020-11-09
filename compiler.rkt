@@ -1358,24 +1358,20 @@
                  [(equal? v d) (verbose "skip self edge on" d)]
                  [else (add-edge! g d v)])))
        ast]
-      [(Callq f)
+      [(or (IndirectCallq f) (Callq f))
        (define vector-vars
 	 (filter (lambda (x) (not (equal? x '()))) (for/list ([e locals]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '()))))
-       (if (eqv? f 'collect)
-           (for ([v live-after])
-             (for ([u caller-save-for-alloc^])
-               (if (equal? v u)
-                   (verbose "skip self edge on" v)
-                   (add-edge! g u v)))
-             (for ([u callee-save-for-alloc^])
-               (if (or (equal? v u) (not (member v vector-vars)))
-                   (verbose "skip self edge or non-vector on" v)
-                   (add-edge! g u v))))
-           (for ([v live-after])
-             (for ([u caller-save-for-alloc^])
-               (if (equal? v u)
-                   (verbose "skip self edge on" v)
-                   (add-edge! g u v)))))
+       #;(define vector-vars
+               (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
+       (for ([v live-after])
+         (for ([u caller-save-for-alloc^])
+           (if (equal? v u)
+               (verbose "skip self edge on" v)
+               (add-edge! g u v)))
+         (for ([u callee-save-for-alloc^])
+           (if (or (equal? v u) (not (member v vector-vars)))
+               (verbose "skip self edge or non-vector on" v)
+               (add-edge! g u v))))
        ast]
       [else
        (for ([v live-after])
@@ -1398,16 +1394,21 @@
             [new-info '()])
        (Block info ss))]))
 
+(define (build-interference-cfg locals)
+  (λ (def) 
+    (let ([g (undirected-graph '())])
+      (for ([v locals]) (add-vertex! g v))
+      (cons (Def-name def)
+            (for/list ([(label block) (in-dict (Def-body def))])
+              (cons label (build-interference-block^ block g locals)))))))
+
 (define (build-interference ast)
   (match ast
-    [(Program info (CFG cfg))
-     (let* ([locals (dict-ref info 'locals)]
-            [g (undirected-graph '())])
-       (for ([v locals]) (add-vertex! g v))
-       (let* ([new-cfg (for/list ([(label block) (in-dict cfg)])
-                         (cons label (build-interference-block^ block g locals)))]
-              [new-info (dict-set info 'conflicts g)])
-         (Program new-info (CFG new-cfg))))]))
+    [(ProgramDefs info defns)
+     (define locals (dict-ref info 'locals))
+     (define interference-graphs (map (build-interference-cfg locals) defns))
+     (define new-info (dict-set info 'conflicts interference-graphs))
+     (ProgramDefs new-info defns)]))
 
 ;; allocate-registers
 
