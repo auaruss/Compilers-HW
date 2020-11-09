@@ -264,7 +264,7 @@
        (define-values (body^ ty) ((type-check-exp new-env) body))
        (unless (equal? ty 'Integer)
          (error "result of the program must be an integer, not " ty))
-       (ProgramDefsExp info ds^ body^)]
+       (ProgramDefsExp '() ds^ body^)]
       [else (error 'type-check "R4/type-check unmatched ~a" e)])))
 
 (define (type-check-R4 p)
@@ -882,7 +882,7 @@
 #;(explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02))))))))
 
 
-;;uncover-locals-helper : C2 list of blocks -> association list of locals and their types
+;;uncover-locals-helper : C3 list of blocks -> association list of locals and their types
 (define (uncover-locals-tail e)
   (match e
    [(Assign (Var v) (HasType e t))
@@ -896,13 +896,16 @@
   (append* (for/list ([l es])
 		     (uncover-locals-tail (cdr l)))))
 
-;; uncover-locals : C2 -> C2
+;; uncover-locals : C3 -> C3
 (define (uncover-locals p)
   (match p
-    [(Program info (CFG es))
-     (Program (dict-set info 'locals (uncover-locals-helper es)) (CFG es))]))
+    [(ProgramDefs info ds)
+     (define es (append* (for/list ([d ds]) (match d
+                                     [(Def label paramtypes returntype info def-alist)
+                                      def-alist]))))
+     (ProgramDefs (dict-set info 'locals (uncover-locals-helper es)) ds)]))
 
-;;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 r3_15)))))))
+#;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))))))
 
 ;; new select-instructions for R3
 
