@@ -323,6 +323,8 @@
     [(HasType (Apply fs es) type)
      (define new-es (for/list ([e es]) (shrink-exp e)))
      (HasType (Apply (shrink-exp fs) new-es) type)]
+    [(HasType (Let x e body) type)
+     (HasType (Let x (shrink-exp e) (shrink-exp body)) type)]
     [else e]
     ))
 
@@ -334,6 +336,37 @@
                                           (Def f paramtypes rt info (shrink-exp body))])))
      (ProgramDefs info (append new-ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
     ))
+
+(define r4p26 (parse-program `(program '() (define (g [x : Integer]) : Integer
+  (let ([v (vector 1)])
+    (if (eq? x 0)
+        0
+        (g (- x (vector-ref v 0))))))
+
+(let ([v1 (vector 1)])
+(let ([v2 (vector 1)])
+(let ([v3 (vector 1)])
+(let ([v4 (vector 1)])
+(let ([v5 (vector 1)])
+(let ([v6 (vector 1)])
+(let ([v7 (vector 1)])
+(let ([v8 (vector 1)])
+(let ([v9 (vector 1)])
+(let ([v10 (vector 1)])
+(let ([y (g 1000)])    ;; a function call with live vector-typed variables.
+    (+ (+ 32 y)
+       (+ (vector-ref v1 0)
+       (+ (vector-ref v2 0)
+          (+ (vector-ref v3 0)
+             (+ (vector-ref v4 0)
+                (+ (vector-ref v5 0)
+                   (+ (vector-ref v6 0)
+                      (+ (vector-ref v7 0)
+                         (+ (vector-ref v8 0)
+                            (+ (vector-ref v9 0)
+                               (vector-ref v10 0))))))))))))))))))))))
+)))
+#;(shrink (type-check-R4 r4p26))
 
 
 ;;Uniquify Pass: R4 -> R4
@@ -1034,6 +1067,13 @@
                                (Reg (list-ref ARGREGS curr))))
             (assign-arg-regs (cdr args) (add1 curr)))))
 
+(define (assign-regs-args args curr)
+  (if (empty? args)
+      empty
+      (cons (Instr 'movq (list (Reg (list-ref ARGREGS curr))
+                               (sel-ins-atm (car args))))
+            (assign-regs-args (cdr args) (add1 curr)))))
+
 
 
 (define (sel-ins-stmt c0stmt)
@@ -1151,9 +1191,12 @@
     [(ProgramDefs info ds)
      (define new-ds (for/list ([d ds]) (match d
                                          [(Def label paramtypes returntype info alist)
+                                          (define args (for/list ([param paramtypes]) (match param
+                                                                                        [`(,v : ,t)
+                                                                                         (Var v)])))
                                           (define new-alist (for/list ([p alist])
-                                                              (cons (car p) (Block '() (sel-ins-tail (cdr p) label)))))
-                                          (Def label paramtypes returntype
+                                                              (cons (car p) (Block '() (append (assign-regs-args args 0) (sel-ins-tail (cdr p) label))))))
+                                          (Def label '() returntype
                                                (dict-set info 'num-params (length paramtypes))
                                                new-alist)])))
      (ProgramDefs info new-ds)]))
@@ -1167,7 +1210,6 @@
 )
 (+ (tail-sum 5 0) 27))))
 
-#;(printf "~a" (shrink (type-check-R4 jeremytest)))
 #;(select-instructions (uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 jeremytest))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
