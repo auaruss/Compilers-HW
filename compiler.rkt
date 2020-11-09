@@ -493,7 +493,7 @@
                          (match e
                            [(HasType e^ t) t])))
      (if (> (length arg*) 6)
-         (Apply (recur f) (append (map recur (take arg* 5)) (list (recur (HasType (Prim 'vector (drop arg* 5)) `(Vector ,@(drop type-list arg*)))))))
+         (Apply (recur f) (append (map recur (take arg* 5)) (list (recur (HasType (Prim 'vector (drop arg* 5)) `(Vector ,@(drop type-list 5)))))))
          (Apply (recur f) (map recur arg*)))]
     [(Prim op es) (Prim op (map recur es))]
     [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
@@ -674,8 +674,8 @@
     [(HasType (Apply f es) t)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
-     (define new-f (rco-exp f))
-     (make-lets^ (append* sss) (HasType (Apply new-f new-es) t))]
+     (define-values (new-f f-ss) (rco-atom f))
+     (make-lets^ (append (append* sss) f-ss) (HasType (Apply new-f new-es) t))]
     [(If e1 e2 e3)
      (define new-es
        (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
@@ -689,6 +689,15 @@
      (HasType (rco-exp e) t)]
     ))
 
+(define r4p25 (parse-program `(program '() (define (id [x : Integer]) : Integer x)
+
+(define (f [v : (Vector (Integer -> Integer))]) : (Integer -> Integer)
+  (vector-ref v 0))
+
+((f (vector id)) 42)
+)))
+
+#;(remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))))
 
 ; explicate-tail : R4 -> C3Tail x [Var]
 ; takes in R4 expression and produces C3 Tail and list of let-bound variables
@@ -885,11 +894,16 @@
 ;;uncover-locals-helper : C3 list of blocks -> association list of locals and their types
 (define (uncover-locals-tail e)
   (match e
-   [(Assign (Var v) (HasType e t))
-    (list (cons v t))]
-   [(Seq s t)
-    (append (uncover-locals-tail s) (uncover-locals-tail t))]
-   [_ (list)])
+    [(Assign (Var v) (HasType e t))
+     (list (cons v t))]
+    [(Seq s t)
+     (append (uncover-locals-tail s) (uncover-locals-tail t))]
+    [(TailCall f es)
+     (filter (λ (v) (not (equal? v '()))) (for/list ([e es]) (match e
+                          [(HasType (Var v) t)
+                           (cons v t)]
+                          [else '()])))]
+    [_ (list)])
   )
 
 (define (uncover-locals-helper es)
@@ -900,10 +914,24 @@
 (define (uncover-locals p)
   (match p
     [(ProgramDefs info ds)
-     (define es (append* (for/list ([d ds]) (match d
+     (define new-ds (for/list ([d ds]) (match d
+                                     [(Def label paramtypes returntype info def-alist)
+                                      (define paramvars (for/list ([param paramtypes]) (match param
+                                                                       [`(,v : ,t)
+                                                                        (cons v t)])))
+                                      (Def label paramtypes returntype (dict-set info 'locals (append paramvars (uncover-locals-helper def-alist))) def-alist)])))
+     (define new-locals (append* (for/list ([d new-ds]) (match d
+                                     [(Def label paramtypes returntype info def-alist)
+                                      (dict-ref info 'locals)]))))
+     #;(define es (append* (for/list ([d new-ds]) (match d
                                      [(Def label paramtypes returntype info def-alist)
                                       def-alist]))))
-     (ProgramDefs (dict-set info 'locals (uncover-locals-helper es)) ds)]))
+     #;(define paramvars (append* (for/list ([d ds]) (match d
+                                     [(Def label paramtypes returntype info def-alist)
+                                      (for/list ([param paramtypes]) (match param
+                                                                       [`(,v : ,t)
+                                                                        (cons v t)]))]))))
+     (ProgramDefs (dict-set info 'locals new-locals #;(append paramvars (uncover-locals-helper es))) new-ds)]))
 
 #;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))))))
 
