@@ -1696,7 +1696,7 @@
                    (initialize-garbage-collector root-spills)
                    (list (Jmp 'start))))))
 
-(define (make-conclusion stack-size root-spills)
+(define (make-conclusion stack-size root-spills ret)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
@@ -1719,6 +1719,7 @@
 
 (define (stringify-arg arg)
   (match arg
+    [(FunRef lbl) (format "~a(%rip)" (label-name lbl))]
     [(Global name)
      (format "~a(%rip)" (label-name name))]
     [(Imm n) (format "$~a" n)]
@@ -1727,6 +1728,17 @@
 
 (define (stringify-in instr)
   (match instr
+    [(IndirectCallq arg)
+     (define st (stringify-arg arg))
+     (format "callq *~a" st)]
+    [(TailJmp arg)
+     (define popframe "pop that frame here")
+     (define st (stringify-arg arg))
+     (format "~ajmp *~a" popframe st)]
+    [(Instr 'leaq (list arg reg))
+     (define st1 (stringify-arg arg))
+     (define st2 (stringify-arg reg))
+     (format "leaq\t~a, ~a" st1 st2)]
     [(Instr 'addq (list a1 a2))
      (define st1 (stringify-arg a1))
      (define st2 (stringify-arg a2))
@@ -1780,9 +1792,14 @@
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (match p
-    [(Program info (CFG es))
-     (define new-es (cons (cons 'conclusion (make-conclusion (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
-			  (cons (cons 'main (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
+    [(ProgramDefs info ds)
+     (define new-ds
+       (for/list ([d ds])
+         (match d [(Def label paramtypes returntype info blocks)
+                   ...])))]
+    #;[(Program info (CFG es))
+       (define new-es (cons (cons 'conclusion (make-conclusion (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
+                            (cons (cons 'main (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
 				es)))
      (format "~a"
              (foldr string-append ""
