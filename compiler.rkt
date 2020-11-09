@@ -966,34 +966,51 @@
          [res (bitwise-ior type-num type-len)])
     res))
 
-;;(calculate-tag 2 '(Vector (Vector Integer) (Vector Integer)))
-;;(calculate-tag 3 '(Vector Integer Integer (Vector Integer)))
+;; argument registers in order:
+(define ARGREGS '(rdi rsi rdx rcx r8 r9))
+
+;; assign-arg-regs : [C3Atm] -> [x86Instr]
+;; takes in a list of c3 args and returns a list of instructions that move
+;; said args into the correct registers
+
+(define (assign-arg-regs args curr)
+  (if (empty? args)
+      empty
+      (cons (Instr 'movq (list (sel-ins-atm (car args))
+                               (Reg (list-ref ARGREGS curr))))
+            (assign-arg-regs (cdr args) (add1 curr)))))
+
+
 
 (define (sel-ins-stmt c0stmt)
   (match c0stmt
     [(HasType stmt type) (sel-ins-stmt stmt)]
     [(Collect n) (list (Instr 'movq (list (Reg 'r15) (Reg 'rdi)))
-                       (Instr 'movq (list (Imm n) (Reg 'rsi))) ;; seems right
+                       (Instr 'movq (list (Imm n) (Reg 'rsi)))
                        (Callq 'collect))]
     [(Assign v e)
      (if (atm? e)
          (list (Instr 'movq (list (sel-ins-atm e) v)))
          (match e
+           [(FunRef lbl) (list (Instr 'leaq (list (FunRef lbl) v)))] ;; think this is right
+           [(Call fun args) (append (assign-arg-regs args 0)
+                                    (list (IndirectCallq fun) 
+                                          (Instr 'movq (list (Reg 'rax) v))))]
            [(HasType e^ t) (sel-ins-stmt (Assign v e^))]
            [(Allocate len T)
-            (let ([tag (calculate-tag len T)]) ;; need to actually calculate tag using bitwise stuff
+            (let ([tag (calculate-tag len T)]) 
               (list (Instr 'movq (list (Global 'free_ptr) v))
                     (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
                     (Instr 'movq (list v (Reg 'r11)))
-                    (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))] ;; deref r11 at 0 always?
+                    (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))] 
            [(Prim 'vector-ref (list atm (HasType (Int n) t)))
-            (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) ;; vec is atm?
+            (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) 
                   (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]
            [(Prim 'vector-set! (list atm1 (HasType (Int n) t) atm2))
             (list (Instr 'movq (list (sel-ins-atm atm1) (Reg 'r11)))
                   (Instr 'movq (list (sel-ins-atm atm2) (Deref 'r11 (* 8 (add1 n)))))
                   (Instr 'movq (list (Imm 0) v)))]
-           [(GlobalValue name) (list (Instr 'movq (list (Global name) v)))] ;; ?
+           [(GlobalValue name) (list (Instr 'movq (list (Global name) v)))] 
            [(Void) (list (Instr 'movq (list (Imm 0) v)))]
            [(Prim 'read '())
             (list (Callq 'read_int)
@@ -1039,6 +1056,8 @@
 
 (define (sel-ins-tail c0t)
   (match c0t
+    [(TailCall fun args) (append (assign-arg-regs args 0)
+                                 (list (TailJmp fun)))]
     [(HasType tail type) (sel-ins-tail tail)]
     [(Return e)
      (append (sel-ins-stmt (Assign (Reg 'rax) e))
@@ -1074,6 +1093,13 @@
 ;; select-instructions : C0 -> pseudo-x86
 (define (select-instructions p)
   (match p
+    [(ProgramDefs info ds)
+     (define new-ds (for/list ([d ds]) (match d
+                                         [(Def label paramtypes returntype info alist)
+                                          (define new-alist (for/list ([p alist]) (cons (car p) (sel-ins-tail (cdr p)))))
+                                          (Def label paramtypes returntype info new-alist)])))
+     (ProgramDefs info new-ds)])
+  #;(match p
     [(Program info (CFG es))
      (Program info (CFG (for/list ([ls es]) (cons (car ls) (Block '() (sel-ins-tail (cdr ls)))))))]))
 
