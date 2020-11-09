@@ -77,7 +77,7 @@
      ("expose allocation" ,expose-allocation ,interp-F1)
      ("remove complex opera*" ,remove-complex-opera* ,interp-F1)
      ("explicate control" ,explicate-control ,interp-C3)
-     #;("uncover locals" ,uncover-locals ,interp-C2)
+     ("uncover locals" ,uncover-locals ,interp-C3)
      #;("instruction selection" ,select-instructions ,interp-pseudo-x86-2)
      #;("uncover live" ,uncover-live ,interp-pseudo-x86-2)
      #;("build interference" ,build-interference ,interp-pseudo-x86-2)
