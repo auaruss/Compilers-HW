@@ -1607,6 +1607,17 @@
 
 (define (patch-instructions-instr px86instr)
   (match px86instr
+    [(IndirectCallq lbl) (list (IndirectCallq lbl))] ;; don't need to change this
+    [(TailJmp arg)
+     (match arg
+       [(Reg 'rax) (list (TailJmp arg))]
+       [_ (list (Instr 'movq (list arg (Reg 'rax))) ;; this seems right
+                (TailJmp (Reg 'rax)))])]
+    [(Instr 'leaq (list f shouldbereg))
+     (match shouldbereg
+       [(Reg r) (list (Instr 'leaq (list f shouldbereg)))]
+       [_ (list (Instr 'leaq (list f (Reg 'rax)))
+                (Instr 'movq (list (Reg 'rax) shouldbereg)))])] ;; should be good
     [(Instr 'cmpq (list e1 e2))
      (match e2
        [(Imm n) (list (Instr 'movq (list e2 (Reg 'rax))) (Instr 'cmpq (list e1 (Reg 'rax))))]
@@ -1636,8 +1647,16 @@
 
 (define (patch-instructions p)
   (match p
-    [(Program info (CFG es)) (Program info (CFG (for/list ([ls es]) (cons (car ls) (patch-instructions-block (cdr ls))))))]
-    ))
+    [(ProgramDefs info ds)
+     (define new-ds
+       (for/list ([d ds])
+         (match d
+           [(Def label paramtypes returntype info alist)
+            (define new-alist (for/list ([p alist])
+                                (cons (car p)
+                                      (Block '() (patch-instructions-block (cdr p))))))
+            (Def label paramtypes returntype info new-alist)])))
+     (ProgramDefs info new-ds)]))
 
 ;;TEST
 ;;(patch-instructions (assign-homes (select-instructions (explicate-control r1program-let))))
