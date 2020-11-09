@@ -14,7 +14,7 @@
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
 (define-vertex-property globalCFG live-before-set)
-(define-vertex-property globalCFG label)
+(define-vertex-property globalCFG function-label)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -503,7 +503,7 @@
    (+ a (+ b (+ c (+ d (+ e (+ f (+ g h))))))))
 (add8 0 1 1 1 1 1 1 35)
 )))
-#;(limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))
+
 
 ;;Expose Allocation: F1 -> F1 
 (define (expose-allocation p)
@@ -698,24 +698,28 @@
      (values (Return (Int n)) '())]
     [(Bool b)
      (values (Return (Bool b)) '())]
+    [(FunRef l)
+     (values (Return (FunRef l)) '())]
     [(Prim 'read '())
      (values (Return (Prim 'read '())) '())]
     [(Prim op ls)
      (values (Return (Prim op ls)) '())]
+    [(Apply f es)
+     (values (TailCall f es) '())]
     [(Var x)
      (values (Return (Var x)) '())]
     [(Let x e body) 
-     (define-values (c1tail let-binds) (explicate-tail body))
-     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail)) ;; why var here
+     (define-values (c1tail let-binds) (explicate-tail body funlabel))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail funlabel)) ;; why var here
      (values c1tail^ (cons x (append let-binds let-binds^)))]
     [(If e1 e2 e3)
-     (define-values (c1tail-then let-binds-then) (explicate-tail e2))
-     (define-values (c1tail-else let-binds-else) (explicate-tail e3))  
-     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
+     (define-values (c1tail-then let-binds-then) (explicate-tail e2 funlabel))
+     (define-values (c1tail-else let-binds-else) (explicate-tail e3 funlabel))  
+     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else funlabel))
      (values c1tail-new (append let-binds-then let-binds-else let-binds-new))
      ]
     [(HasType e t)
-     (explicate-tail e)
+     (explicate-tail e funlabel)
      ]
     ))
 
@@ -740,29 +744,33 @@
      (values (Seq (Assign v (Int n)) c) '())]
     [(Bool b)
      (values (Seq (Assign v (Bool b)) c) '())]
-    [(Prim 'read '())
-     (values (Seq (Assign v (Prim 'read '())) c) '())]
+    [(FunRef l)
+     (values (Seq (Assign v (FunRef l)) c) '())]
     [(Prim op ls)
      (values (Seq (Assign v (Prim op ls)) c)
-             '())] 
+             '())]
+    [(Apply f es)
+     (values (Seq (Assign v (Call f es)) c)
+             '())]
     [(Var x)
      (values (Seq (Assign v (Var x)) c) '())]
     [(Let x e body) 
-     (define-values (c1tail let-binds) (explicate-assign body v c))
-     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail))
+     (define-values (c1tail let-binds) (explicate-assign body v c funlabel))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail funlabel))
      (values c1tail^ (cons x (append let-binds let-binds^)))]
     [(If e1 e2 e3)
      (define label (gensym 'block))
      (add-vertex! globalCFG label)
      (instructions-set! label c)
      (live-before-set-set! label (list->set '()))
-     (define-values (c1tail-then let-binds-then) (explicate-assign e2 v (Goto label)))
-     (define-values (c1tail-else let-binds-else) (explicate-assign e3 v (Goto label)))
-     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
+     (function-label-set! label funlabel)
+     (define-values (c1tail-then let-binds-then) (explicate-assign e2 v (Goto label) funlabel))
+     (define-values (c1tail-else let-binds-else) (explicate-assign e3 v (Goto label) funlabel))
+     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else funlabel))
      (values c1tail-new (append let-binds-then let-binds-else let-binds-new))
      ]
     [(HasType e t)
-     (define-values (c1tail let-binds) (explicate-assign e v c))
+     (define-values (c1tail let-binds) (explicate-assign e v c funlabel))
      (match c1tail
       [(Seq (Assign v e^) tail)
        (values (Seq (Assign v (HasType e^ t)) tail) let-binds)]
@@ -782,9 +790,11 @@
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
+     (function-label-set! label1 funlabel)
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
+     (function-label-set! label2 funlabel)
      (values (IfStmt (Prim 'eq? (list r4exp (Bool #t))) (Goto label1) (Goto label2))
              '())]
     [(Prim op ls)
@@ -793,23 +803,40 @@
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
+     (function-label-set! label1 funlabel)
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
+     (function-label-set! label2 funlabel)
      (values (IfStmt r4exp (Goto label1) (Goto label2))
-             '())] 
+             '())]
+    [(Apply f es)
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
+     (function-label-set! label1 funlabel)
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
+     (function-label-set! label2 funlabel)
+     (values (IfStmt (Call f es) (Goto label1) (Goto label2))
+             '())]
     [(Let x e body)
      (define label1 (gensym 'block))
      (define label2 (gensym 'block))
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
+     (function-label-set! label1 funlabel)
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
+     (function-label-set! label2 funlabel)
      (define temp (gensym 'tmp))
-     (define-values (c1tail let-binds) (explicate-assign body (Var temp) (IfStmt (Prim 'eq? (list (Var temp) (Bool #t))) (Goto label1) (Goto label2))))
-     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail))
+     (define-values (c1tail let-binds) (explicate-assign body (Var temp) (IfStmt (Prim 'eq? (list (Var temp) (Bool #t))) (Goto label1) (Goto label2)) funlabel))
+     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail funlabel))
      (values c1tail^ (cons x (cons temp (append let-binds let-binds^))))
      ]
     [(If e1 e2 e3)
@@ -818,15 +845,17 @@
      (add-vertex! globalCFG label1)
      (instructions-set! label1 c1)
      (live-before-set-set! label1 (list->set '()))
+     (function-label-set! label1 funlabel)
      (add-vertex! globalCFG label2)
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
-     (define-values (c1tail-then let-binds-then) (explicate-pred e2 (Goto label1) (Goto label2)))
-     (define-values (c1tail-else let-binds-else) (explicate-pred e3 (Goto label1) (Goto label2)))
-     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else))
+     (function-label-set! label2 funlabel)
+     (define-values (c1tail-then let-binds-then) (explicate-pred e2 (Goto label1) (Goto label2) funlabel))
+     (define-values (c1tail-else let-binds-else) (explicate-pred e3 (Goto label1) (Goto label2) funlabel))
+     (define-values (c1tail-new let-binds-new) (explicate-pred e1 c1tail-then c1tail-else funlabel))
      (values c1tail-new (append let-binds-then let-binds-else let-binds-new)) ]
     [(HasType e t)
-     (explicate-pred e c1 c2)]
+     (explicate-pred e c1 c2 funlabel)]
      ))
 
 ;; explicate-control : R4 -> C3
@@ -837,25 +866,20 @@
      (define new-ds (for/list ([d ds]) (match d
                                          [(Def label paramtypes returntype info e)
                                           (define new-label (string->symbol (string-append (symbol->string label) "start")))
-                                          (define-values (c3t let-binds blocklist) (explicate-tail e label))
+                                          (define-values (c3t let-binds) (explicate-tail e label))
                                           (add-vertex! globalCFG new-label)
                                           (instructions-set! new-label c3t)
                                           (live-before-set-set! new-label (set))
-                                          (set! localvars (append (localvars) (let-binds)))
+                                          (function-label-set! new-label label)
+                                          (set! localvars (append localvars let-binds))
+                                          (define def-alist (filter (λ (v) (not (equal? v '()))) (for/list ([l (get-vertices globalCFG)]) (if (equal? label (function-label l))
+                                                                                                                                              (cons l (instructions l))
+                                                                                                                                              '()))))
+                                          (Def label paramtypes returntype info def-alist)
                                           ])))
-     (define labeled-instruction-lists (for/list ([l (get-vertices globalCFG)]) (cons l (instructions l))))
      (ProgramDefs (cons (cons 'locals localvars) info) new-ds)]))
 
-(define given-let (Let 'x (Let 'y (Prim '- (list (Int 42))) (Var 'y)) (Prim '- (list (Var 'x)))))
-(define r1program-let (Program '() given-let))
-
-(define new-let (Let 'x (Prim 'read '()) (Let 'y (Prim 'read '())
-                                              (Prim '+ (list (Var 'x) (Prim '- (list (Var 'y))))))))
-
-(define newprog (Program '() new-let))
-
-(define asdf (Program '() (Let 'x (Prim '+ (list (Prim 'read '()) (Prim 'read '()))) (Var 'x))))
-
+#;(explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02))))))))
 
 
 ;;uncover-locals-helper : C2 list of blocks -> association list of locals and their types
