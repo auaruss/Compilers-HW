@@ -1042,7 +1042,7 @@
          [res (bitwise-ior type-num type-len)])
     res))
 
-(define uptosel-ins
+#;(define uptosel-ins
   (uncover-locals
    (explicate-control
     (remove-complex-opera*
@@ -1216,15 +1216,19 @@
 ;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; uncover-live
-(define (add-global-CFG-edges label1 instr-ls)
+(define (add-global-CFG-edges label1 instr-ls conclusions)
   (match instr-ls
     ['() '()] ;;does nothing, just ends the function
     [ls 
       (match (car ls)
-	[(Jmp 'conclusion) (add-global-CFG-edges label1 (cdr ls))]
-        [(JmpIf cc label2) (add-directed-edge! globalCFG label1 label2) (add-global-CFG-edges label1 (cdr ls))]
-        [(Jmp label2) (add-directed-edge! globalCFG label1 label2) (add-global-CFG-edges label1 (cdr ls))]
-        [_ (add-global-CFG-edges label1 (cdr ls))]
+	[(JmpIf cc label2) (add-directed-edge! globalCFG label1 label2) (add-global-CFG-edges label1 (cdr ls) conclusions)]
+        [(Jmp label2) (if (not (member label2 conclusions))
+                          (begin
+                            (add-directed-edge! globalCFG label1 label2)
+                            (add-global-CFG-edges label1 (cdr ls) conclusions)
+                            )
+                         (add-global-CFG-edges label1 (cdr ls) conclusions) )]
+        [_ (add-global-CFG-edges label1 (cdr ls) conclusions)]
         )]
     ))
 
@@ -1238,17 +1242,23 @@
 
 (define (instr-read-varset instr) 
   (match instr
-	 [(Instr 'set (list e1 e2))
-	  (list->set '())]
-	 [(Instr 'movzbq (list e1 e2))
-	  (list->set '())]
-	 [(Instr 'movq (list e1 e2))
-	  (instr-arg-varset e1)]
-	 [(Instr op (list e1 e2))
-	  (set-union (instr-arg-varset e1) (instr-arg-varset e2))]
-	 [(Instr 'negq (list e1))
-	  (instr-arg-varset e1)]
-	 [_ (list->set '())]))
+    [(Instr 'set (list e1 e2))
+     (list->set '())]
+    [(Instr 'movzbq (list e1 e2))
+     (list->set '())]
+    [(Instr 'movq (list e1 e2))
+     (instr-arg-varset e1)]
+    [(Instr 'leaq (list e1 e2))
+     (instr-arg-varset e1)]
+    [(Instr op (list e1 e2))
+     (set-union (instr-arg-varset e1) (instr-arg-varset e2))]
+    [(Instr 'negq (list e1))
+     (instr-arg-varset e1)]
+    [(IndirectCallq e1)
+     (instr-arg-varset e1)]
+    [(TailJmp e1)
+     (instr-arg-varset e1)]
+    [_ (list->set '())]))
 
 (define (instr-written-varset instr)
   (match instr
@@ -1262,7 +1272,6 @@
 
 (define (uncover-live-helper instr-ls live-after-set label)
   (cond
-    #;[(null? instr-ls) (list (list->set '()))]
     [(null? instr-ls) (live-before-set-set! label live-after-set) (list live-after-set)]
     [else (let ([new-live-after-set (set-union (set-subtract live-after-set (instr-written-varset (car instr-ls))) (instr-read-varset (car instr-ls)))]) 
 	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set label) (list live-after-set)))]
@@ -1289,31 +1298,27 @@
 
 (define (uncover-live p)
   (match p
-    [(Program info (CFG es)) 
+    [(ProgramDefs info ds)
+     (define es (append* (for/list ([d ds]) (match d
+                                     [(Def label paramtypes rt info ls)
+                                      ls]))))
+     (define conclusions (for/list ([d ds]) (match d
+                                     [(Def label paramtypes rt info ls)
+                                      (string->symbol (string-append (symbol->string label) "conclusion"))])))
      (for ([ls es]) (add-global-CFG-edges (car ls) (match (cdr ls)
-							       [(Block b-info instr-ls) instr-ls])))
-     (Program info (CFG (sort-blocks (tsort (transpose globalCFG)) es)))]
+							       [(Block b-info instr-ls) instr-ls]) conclusions))
+     (define new-blocklist (sort-blocks (tsort (transpose globalCFG)) es))
+     (for ([vertex (get-vertices globalCFG)]) (remove-vertex! globalCFG vertex))
+     (define new-ds (for/list ([d ds]) (match d
+                                         [(Def label paramtypes rt info ls)
+                                          (Def label paramtypes rt info (filter (λ (v) (not (equal? v '()))) (for/list ([pr new-blocklist]) (if (equal? (function-label (car pr)) label)
+                                                                                                                                                pr
+                                                                                                                                                '()))))])))
+     (ProgramDefs info new-ds)]
     ))
 
 
-;;Test from book chapter 3
-(define ch3example (Let 'v (Int 1) (Let 'w (Int 46) (Let 'x (Prim '+ (list (Var 'v) (Int 7))) (Let 'y (Prim '+ (list (Int 4) (Var 'x))) (Let 'z (Prim '+ (list (Var 'x) (Var 'w))) (Prim  '+ (list (Var 'z) (Prim '- (list (Var 'y)))))))))))
-(define ch3program (Program '() ch3example))
-(define r1-11 (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Int 1))))))))
-(define r1-11prog (Program '() r1-11))
-
-(define r1-12 (Prim '+ (list (Let 'x (Int 1) (Var 'x)) (Let 'x (Int 1) (Var 'x)))))
-(define r1-12prog (Program '() r1-12))
-
-(define asd (Prim '+ (list (Int 1) (Prim '+ (list (Int 1) (Int 1))))))
-(define asdp (Program '() asd))
-
-;;match case used to print the block's info
-#;(uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program)))))
-#;(match (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program)))))
-       [(Program info (CFG es))
-	(match (cdr (car es)) 
-	       [(Block b-info instr-ls) b-info])])
+#;(uncover-live (select-instructions (uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 jeremytest)))))))))))
 
 ;; build-interference
 
@@ -1567,7 +1572,6 @@
 (define (allocate-registers p)
   (match p
     [(Program info (CFG es))
-     (for ([vertex (get-vertices globalCFG)]) (remove-vertex! globalCFG vertex))
      (let* ([coloring (color-graph (dict-ref info 'conflicts)
                                   (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))) (dict-ref info 'locals))]
 	    [es^ (for/list ([ls es]) (cons (car ls)
@@ -1695,7 +1699,7 @@
                    (initialize-garbage-collector root-spills)
                    (list (Jmp 'start))))))
 
-(define (make-conclusion stack-size root-spills)
+(define (make-conclusion stack-size root-spills ret)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
@@ -1718,6 +1722,7 @@
 
 (define (stringify-arg arg)
   (match arg
+    [(FunRef lbl) (format "~a(%rip)" (label-name lbl))]
     [(Global name)
      (format "~a(%rip)" (label-name name))]
     [(Imm n) (format "$~a" n)]
@@ -1726,6 +1731,17 @@
 
 (define (stringify-in instr)
   (match instr
+    [(IndirectCallq arg)
+     (define st (stringify-arg arg))
+     (format "callq *~a" st)]
+    [(TailJmp arg)
+     (define popframe "pop that frame here")
+     (define st (stringify-arg arg))
+     (format "~ajmp *~a" popframe st)]
+    [(Instr 'leaq (list arg reg))
+     (define st1 (stringify-arg arg))
+     (define st2 (stringify-arg reg))
+     (format "leaq\t~a, ~a" st1 st2)]
     [(Instr 'addq (list a1 a2))
      (define st1 (stringify-arg a1))
      (define st2 (stringify-arg a2))
@@ -1779,9 +1795,14 @@
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (match p
-    [(Program info (CFG es))
-     (define new-es (cons (cons 'conclusion (make-conclusion (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
-			  (cons (cons 'main (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
+    [(ProgramDefs info ds)
+     (define new-ds
+       (for/list ([d ds])
+         (match d [(Def label paramtypes returntype info blocks)
+                   ...])))]
+    #;[(Program info (CFG es))
+       (define new-es (cons (cons 'conclusion (make-conclusion (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
+                            (cons (cons 'main (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
 				es)))
      (format "~a"
              (foldr string-append ""
