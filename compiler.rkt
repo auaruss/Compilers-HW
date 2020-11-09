@@ -1568,6 +1568,8 @@
       [(JmpIf cc label) (JmpIf cc label)]
       [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e coloring locals)))]))
 
+;; need to store num-spills/stack-space in def info
+
 (define (allocate-registers p)
   (match p
     [(Program info (CFG es))
@@ -1693,18 +1695,18 @@
     (Block '()
            (append (list (Instr 'pushq (list (Reg 'rbp)))
                          (Instr 'movq (list (Reg 'rsp) (Reg 'rbp))))
-                   (map (lambda (x) (Instr 'pushq (list x))) (list (Reg 'rbx) (Reg 'r12) (Reg 'r13) (Reg 'r14) #;(Reg 'r15))) 
+                   (map (lambda (x) (Instr 'pushq (list x))) (list (Reg 'rbx) (Reg 'r12) (Reg 'r13) (Reg 'r14))) 
                    (list (Instr 'subq (list (Imm stack-adjust) (Reg 'rsp)))) 
                    (initialize-garbage-collector root-spills)
                    (list (Jmp 'start))))))
 
-(define (make-conclusion stack-size root-spills ret)
+(define (make-conclusion stack-size root-spills)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
            (append (list (Instr 'subq (list (Imm (* 8 root-spills)) (Reg 'r15)))
                          (Instr 'addq (list (Imm stack-adjust) (Reg 'rsp))))
-                   (map (lambda (x) (Instr 'popq (list x))) (list #;(Reg 'r15) (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx))) 
+                   (map (lambda (x) (Instr 'popq (list x))) (list (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx))) 
                    (list (Instr 'popq (list (Reg 'rbp)))
                          (Retq))))))
 
@@ -1734,9 +1736,13 @@
      (define st (stringify-arg arg))
      (format "callq *~a" st)]
     [(TailJmp arg)
-     (define popframe "pop that frame here")
+     (define popframe
+       (map (lambda (x) (Instr 'popq (list x)))
+            (list (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx) (Reg 'rbp))))
+     (define popstring
+       (foldr (λ (inst rec) (string-append (stringify-in inst) "\n" rec)) "" popframe))
      (define st (stringify-arg arg))
-     (format "~ajmp *~a" popframe st)]
+     (format "~ajmp\t*~a" popstring st)]
     [(Instr 'leaq (list arg reg))
      (define st1 (stringify-arg arg))
      (define st2 (stringify-arg reg))
@@ -1789,25 +1795,30 @@
 (define (format-x86 ins)
   (foldr (λ (f r) (string-append "\t" f "\n" r)) "" (map stringify-in ins)))
      
-     ;(format "~a:\n\t" label)
+;(format "~a:\n\t" label)
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (match p
     [(ProgramDefs info ds)
-     (define new-ds
-       (for/list ([d ds])
-         (match d [(Def label paramtypes returntype info blocks)
-                   ...])))]
-    #;[(Program info (CFG es))
-       (define new-es (cons (cons 'conclusion (make-conclusion (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
-                            (cons (cons 'main (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
-				es)))
-     (format "~a"
-             (foldr string-append ""
-                    (for/list ([pair new-es])
-                      (string-append (if (equal? (car pair) 'main) (format "\n\t.globl ~a\n~a" (label-name 'main) (label-name 'main)) (label-name (car pair))) ":\n" (format-x86 (Block-instr* (cdr pair))))))
-             )]))
+     (foldr string-append ""
+            (for/list ([d ds])
+              (match d [(Def label paramtypes returntype info alist)
+                        (define new-alist (cons (cons (string->symbol (string-append (symbol->string label) "conclusion"))
+                                                      (make-conclusion (dict-ref info 'stack-space)
+                                                                       (cdr (dict-ref info 'num-spills)))) 
+                                                (cons (cons label (make-main (dict-ref info 'stack-space)
+                                                                             (cdr (dict-ref info 'num-spills)))) 
+                                                      alist)))
+                        (format "~a"
+                                (foldr string-append ""
+                                       (for/list ([pair new-alist])
+                                         (string-append (if (equal? (car pair) label) ;; .align 16 ?
+                                                            (format "\n\t.globl ~a\n~a"
+                                                                    (label-name label)
+                                                                    (label-name label))
+                                                            (label-name (car pair)))
+                                                        ":\n" (format-x86 (Block-instr* (cdr pair)))))))])))]))
 
 (define r2_58prog (Program '() (If (Prim '<= (list (Int 2) (Int 2))) (Int 42) (Int 0))))
 
