@@ -983,8 +983,6 @@
 
 #;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))))))
 
-;; new select-instructions for R3
-
 ; atm? : c0exp -> bool
 
 (define (atm? c0exp)
@@ -1189,16 +1187,18 @@
 (define (select-instructions p)
   (match p
     [(ProgramDefs info ds)
-     (define new-ds (for/list ([d ds]) (match d
-                                         [(Def label paramtypes returntype info alist)
-                                          (define args (for/list ([param paramtypes]) (match param
-                                                                                        [`(,v : ,t)
-                                                                                         (Var v)])))
-                                          (define new-alist (for/list ([p alist])
-                                                              (cons (car p) (Block '() (append (assign-regs-args args 0) (sel-ins-tail (cdr p) label))))))
-                                          (Def label '() returntype
-                                               (dict-set info 'num-params (length paramtypes))
-                                               new-alist)])))
+     (define new-ds (for/list ([d ds])
+                      (match d
+                        [(Def label paramtypes returntype info alist)
+                         (define args (for/list ([param paramtypes])
+                                        (match param
+                                          [`(,v : ,t)
+                                           (Var v)])))
+                         (define new-alist (for/list ([p alist])
+                                             (cons (car p) (Block '() (append (assign-regs-args args 0) (sel-ins-tail (cdr p) label))))))
+                         (Def label '() returntype
+                              (dict-set info 'num-params (length paramtypes))
+                              new-alist)])))
      (ProgramDefs info new-ds)]))
 
 
@@ -1225,12 +1225,9 @@
         [(Jmp label2) (if (not (member label2 conclusions))
                           (begin
                             (add-directed-edge! globalCFG label1 label2)
-                            (add-global-CFG-edges label1 (cdr ls) conclusions)
-                            )
+                            (add-global-CFG-edges label1 (cdr ls) conclusions))
                          (add-global-CFG-edges label1 (cdr ls) conclusions) )]
-        [_ (add-global-CFG-edges label1 (cdr ls) conclusions)]
-        )]
-    ))
+        [_ (add-global-CFG-edges label1 (cdr ls) conclusions)])]))
 
 ;; turn association list of blocks in CFG into graph
 ;; then reverse topo sort said graph, uncover-live that sorted list
@@ -1280,16 +1277,13 @@
 (define (get-first-live ls)
   (match ls
     ['() (list->set '())]
-    [else (set-union (live-before-set (car ls)) (get-first-live (cdr ls)))]
-    )
-  )
+    [else (set-union (live-before-set (car ls)) (get-first-live (cdr ls)))]))
 
 (define (find-instructions label es)
   (if (eq? label (car (car es))) 
       (match (cdr (car es))
         [(Block b-info ls) ls])
-      (find-instructions label (cdr es)))
-  )
+      (find-instructions label (cdr es))))
 
 (define (sort-blocks ordered-vertices es)
   (for/list ([label ordered-vertices]) 
@@ -1314,16 +1308,11 @@
                                           (Def label paramtypes rt info (filter (λ (v) (not (equal? v '()))) (for/list ([pr new-blocklist]) (if (equal? (function-label (car pr)) label)
                                                                                                                                                 pr
                                                                                                                                                 '()))))])))
-     (ProgramDefs info new-ds)]
-    ))
-
+     (ProgramDefs info new-ds)]))
 
 #;(uncover-live (select-instructions (uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 jeremytest)))))))))))
 
 ;; build-interference
-
-;; movzbq is similar to movq
-;; consider register al the same as rax
 
 (define caller-save-for-alloc^ '(al rax rdx rcx rsi rdi r8 r9 r10 r11))
 (define callee-save-for-alloc^ '(rsp rbp rbx r12 r13 r14 r15))
@@ -1442,8 +1431,7 @@
 	       (and (odd? cand) 
 		    (not (vector-type? locals v)))))
       cand
-      (choose-least satset (add1 cand) locals v)
-      ))
+      (choose-least satset (add1 cand) locals v)))
 
 ;; hash-key : [Hash Key Val] Val -> Key
 ;; returns the (a) key that maps to given val
@@ -1463,35 +1451,6 @@
 ;; color-graph : InterferenceGraph -> [Hash Var SatSet] -> [(Var . Nat)]
 ;; takes an unweighted/undirected intereference graph and a mutable hashtable of vars to saturation sets
 ;; in program, returns mapping from var to color (Nat)
-
-;; interference graph from book example
-(define ig1 (unweighted-graph/undirected '((t z) (z y) (z w) (y w) (x w) (w v))))
-(define h1 (make-hash '((t . ()) (z . ()) (y . ()) (w . ()) (x . ()) (v . ()))))
-(define testhash (hash 't '(a e w) 'z '() 'y '(w q f f d) 'w '() 'x '(z a) 'v '(e)))
-
-#;(define ch3ig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify ch3program))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-#;(define r1-11ig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify r1-11prog))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-#;(define r1-12ig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify r1-12prog))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-#;(define asdig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify asdp))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-
-
-
 
 (define (color-graph ig hash locals)
   (if (hash-empty? hash)
@@ -1516,7 +1475,7 @@
 ;; a pseudo-x86 exp with allocated registers according to color-graph
 
 (define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
-                            (7 . r10) #;(8 . r11) (8 . r12) (9 . r13) (10 . r14)))
+                            (7 . r10) (8 . r12) (9 . r13) (10 . r14)))
 
 
 (define spilled-root (mutable-set))
@@ -1597,16 +1556,7 @@
                 (CFG 
                  es^)))]))
 
-
-(define tuples-and-gc-prog (Program '() (Prim 'vector-ref (list (Prim 'vector-ref (list (Prim 'vector (list (Prim 'vector (list (Int 42))))) (Int 0))) (Int 0)))))
-#;(explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog))))))
-
-;; Grant
-
 ;; patch-instructions : psuedo-x86 -> x86
-
-;; fix cmpq with second arg as immediate
-;; fix movzbq target arg must be register (move stack var into reg for it)
 
 (define (patch-instructions-instr px86instr)
   (match px86instr
@@ -1661,21 +1611,9 @@
             (Def label paramtypes returntype info new-alist)])))
      (ProgramDefs info new-ds)]))
 
-;;TEST
-;;(patch-instructions (assign-homes (select-instructions (explicate-control r1program-let))))
-
-;;  (error "TODO: code goes here (patch-instructions)"))
-
-;; Grant/Sam
-
 (define r1-10 (Let 'x (Prim 'read '()) (Let 'y (Prim 'read '()) (Prim '+ (list (Var 'x) (Prim '- (list (Var 'y))))))))
 (define r1-10prog (Program '() r1-10))
 
-;;define x86prog (patch-instructions (assign-homes (select-instructions (explicate-control r1program-let)))))
-;x86prog
-
-;rsp  rbx r12 r13 r14 r15
-;
 (define callee-reg-str-push
   "\tpushq\t%rbx\n\tpushq\t%r12\n\tpushq\t%r13\n\tpushq\t%r14\n\tpushq\t%r15")
 ;
@@ -1821,22 +1759,3 @@
                                                             (label-name (car pair)))
                                                         ":\n" (format-x86 (Block-instr* (cdr pair)))))))])))]))
 
-(define r2_58prog (Program '() (If (Prim '<= (list (Int 2) (Int 2))) (Int 42) (Int 0))))
-
-#;(define testprinthw4 (print-x86
-                      (patch-instructions
-                       (allocate-registers
-                        (build-interference
-                         (uncover-live
-                          (select-instructions
-                           (uncover-locals
-                            (explicate-control
-                             (remove-complex-opera*
-                              (expose-allocation
-                               (uniquify
-                                (shrink
-                                 (type-check-R3 hw4prog))))))))))))))
-
-;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (Program '() (Prim 'read (list)))))))))))))
-;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program))))))))))
-;;Grant/Sam
