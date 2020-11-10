@@ -1040,17 +1040,6 @@
          [res (bitwise-ior type-num type-len)])
     res))
 
-#;(define uptosel-ins
-  (uncover-locals
-   (explicate-control
-    (remove-complex-opera*
-     (expose-allocation
-      (limit-functions
-       (reveal-functions
-        (uniquify
-         (shrink
-          (type-check-R4 r4_01))))))))))
-
 ;; argument registers in order:
 (define ARGREGS '(rdi rsi rdx rcx r8 r9))
 
@@ -1349,9 +1338,11 @@
        ast]
       [(or (IndirectCallq f) (Callq f))
        (define vector-vars
-	 (filter (lambda (x) (not (equal? x '()))) (for/list ([e locals]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '()))))
+         (filter (lambda (x) (not (equal? x '())))
+                 (for/list ([e locals]) (if (and (list? (cdr e))
+                                                 (equal? 'Vector (car (cdr e)))) (car e) '()))))
        #;(define vector-vars
-               (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
+           (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
        (for ([v live-after])
          (for ([u caller-save-for-alloc^])
            (if (equal? v u)
@@ -1383,21 +1374,24 @@
             [new-info '()])
        (Block info ss))]))
 
-(define (build-interference-cfg locals)
-  (λ (def) 
-    (let ([g (undirected-graph '())])
-      (for ([v locals]) (add-vertex! g v))
-      (cons (Def-name def)
-            (for/list ([(label block) (in-dict (Def-body def))])
-              (cons label (build-interference-block^ block g locals)))))))
+(define build-interference-cfg
+  (λ (def)
+    (match def
+      [(Def label paramtypes returntype info alist)
+       (define locals (dict-ref info 'locals))
+       (let ([g (undirected-graph '())])
+         (for ([v locals]) (add-vertex! g (car v)))
+         (for/list ([(label block) (in-dict alist)])
+                          (build-interference-block^ block g locals))
+         (Def label paramtypes returntype
+              (dict-set info 'conflicts g)
+              alist))])))
 
 (define (build-interference ast)
   (match ast
     [(ProgramDefs info defns)
-     (define locals (dict-ref info 'locals))
-     (define interference-graphs (map (build-interference-cfg locals) defns))
-     (define new-info (dict-set info 'conflicts interference-graphs))
-     (ProgramDefs new-info defns)]))
+     (define new-ds (map build-interference-cfg defns))
+     (ProgramDefs info new-ds)]))
 
 ;; allocate-registers
 
@@ -1481,11 +1475,26 @@
 (define spilled-root (mutable-set))
 (define spilled-stack (mutable-set))
 
+(define alloc-reg
+  (build-interference
+   (uncover-live
+    (select-instructions
+     (uncover-locals
+      (explicate-control
+       (remove-complex-opera*
+        (expose-allocation
+         (limit-functions
+          (reveal-functions
+           (uniquify
+            (shrink
+             (type-check-R4 r4_01)))))))))))))
+
 ;; change sig to
 ;; allocate-registers-exp : pseudo-x86 [Var . Nat] -> pseudo-x86
 
 (define (allocate-registers-exp e coloring locals)
     (match e
+      [(FunRef lbl) (FunRef lbl)]
       [(Reg reg) (Reg reg)]
       [(Imm int) (Imm int)]
       [(Deref v i) (Deref v i)]
@@ -1504,6 +1513,8 @@
 			  (let ([location (* -8 (quotient (- colnum 10) 2))])
                           (set-add! spilled-stack location)
                           (Deref 'rbp (- location 32)))))))]
+      [(Instr 'leaq (list arg reg)) (Instr 'leaq (list (allocate-registers-exp arg coloring locals)
+                                                       (allocate-registers-exp reg coloring locals)))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
                                                      (allocate-registers-exp e2 coloring locals)))]
       [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring locals)
@@ -1519,6 +1530,8 @@
       [(Instr 'set (list cc e)) (Instr 'set (list cc
                                                      (allocate-registers-exp e coloring locals)))]
       [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 coloring locals)))]
+      [(IndirectCallq lbl) (IndirectCallq (allocate-registers-exp lbl coloring locals))]
+      [(TailJmp arg) (TailJmp (allocate-registers-exp arg coloring locals))]
       [(Callq l) (Callq l)]
       [(Retq) (Retq)]
       [(Global var) (Global var)]
@@ -1532,29 +1545,28 @@
 
 (define (allocate-registers p)
   (match p
-    [(Program info (CFG es))
-     (let* ([coloring (color-graph (dict-ref info 'conflicts)
-                                  (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))) (dict-ref info 'locals))]
-	    [es^ (for/list ([ls es]) (cons (car ls)
-                                           (allocate-registers-exp
-                                            (cdr ls)
-                                            coloring
-                                            (dict-ref info 'locals))
-                                           ))])
-       (define s1 (set-count spilled-stack))
-       (define s2 (set-count spilled-root)) 
-       (set! spilled-root (mutable-set))
-       (set! spilled-stack (mutable-set))
-       (Program (list (cons 'stack-space (* 8 s1) #;(let ([f (* 8 (- (if (> (length coloring) 0)
-                                                              (apply max (map (λ (assoc) (cdr assoc)) coloring))
-                                                              0) 11))])
-                                           (if (negative? f)
-                                               0
-                                               f #;(+ f (modulo f 16)))))
-                      (cons 'num-spills `(,s1 . ,s2))
-                )
-                (CFG 
-                 es^)))]))
+    [(ProgramDefs info ds)
+     (define new-ds (for/list ([d ds])
+                      (match d
+                        [(Def label paramtypes returntype info alist)
+                         (let* ([locals (dict-ref info 'locals)]
+                                [coloring (color-graph (dict-ref info 'conflicts)
+                                                       (make-hash (map (λ (a) `(,(car a) . ()))
+                                                                       locals))
+                                                       locals)]
+                                [new-alist (for/list ([pr alist]) (cons (car pr)
+                                                                        (allocate-registers-exp
+                                                                         (cdr pr)
+                                                                         coloring
+                                                                         locals)))])
+                           (define s1 (set-count spilled-stack))
+                           (define s2 (set-count spilled-root)) 
+                           (set! spilled-root (mutable-set))
+                           (set! spilled-stack (mutable-set))
+                           (define new-info (append (list (cons 'stack-space (* 8 s1))
+                                                          (cons 'num-spills `(,s1 . ,s2))) info))
+                           (Def label paramtypes returntype new-info new-alist))])))
+     (ProgramDefs info new-ds)]))
 
 ;; patch-instructions : psuedo-x86 -> x86
 

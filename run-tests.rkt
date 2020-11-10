@@ -81,7 +81,7 @@
      ("instruction selection" ,select-instructions ,interp-pseudo-x86-3)
      ("uncover live" ,uncover-live ,interp-pseudo-x86-3)
      ("build interference" ,build-interference ,interp-pseudo-x86-3)
-     #;("allocate registers" ,allocate-registers ,interp-x86-3)
+     ("allocate registers" ,allocate-registers ,interp-x86-3)
      #;("patch instructions" ,patch-instructions ,interp-x86-3)
      #;("print x86" ,print-x86 #f)
      ))
