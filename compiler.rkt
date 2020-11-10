@@ -9,7 +9,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'abstract-syntax)
+(AST-output-syntax 'concrete-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -23,6 +23,10 @@
                                        (define (add1 [x : Integer]) : Integer
                                          (+ x 1))
                                        (vector-ref (map-vec add1 (vector 0 41)) 1))))
+
+(define lecture-ex (parse-program `(program '() (define (add  [x : Integer] [y : Integer]) : Integer
+                                                  (+ x y))
+                                            (add 40 2))))
 ;;(define r4_01prog (ProgramDefsExp '() r4_01))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1323,6 +1327,8 @@
     [(JmpIf cc label) (set)]
     [(Jmp label) (set)]
     [(Callq f) (set)]
+    [(TailJmp arg) (set)]
+    [(IndirectCallq arg) (set)]
     [else (error "write-vars unmatched" instr)]))
 
 (define (build-interference-instr^ live-after g locals)
@@ -1368,7 +1374,7 @@
   (match ast
     [(Block info ss)
      (let* ([lives info]
-            [live-afters (cdr lives)]
+            [live-afters lives]
             [new-ss (for/list ([inst ss] [live-after live-afters])
                       ((build-interference-instr^ live-after g locals) inst))]
             [new-info '()])
@@ -1475,7 +1481,11 @@
 (define spilled-root (mutable-set))
 (define spilled-stack (mutable-set))
 
-(define alloc-reg
+(define r4_02 (parse-program `(program '()  (define (add8  [a : Integer] [b : Integer] [c : Integer] [d : Integer] [e : Integer] [f : Integer] [g : Integer] [h : Integer])     : Integer
+                                              (+ a (+ b (+ c (+ d (+ e (+ f (+ g h))))))))
+                                       (add8 0 1 1 1 1 1 1 35))))
+
+#;(define upto-alloc-reg
   (build-interference
    (uncover-live
     (select-instructions
@@ -1487,7 +1497,7 @@
           (reveal-functions
            (uniquify
             (shrink
-             (type-check-R4 r4_01)))))))))))))
+             (type-check-R4 r4_02)))))))))))))
 
 ;; change sig to
 ;; allocate-registers-exp : pseudo-x86 [Var . Nat] -> pseudo-x86
@@ -1559,6 +1569,7 @@
                                                                          (cdr pr)
                                                                          coloring
                                                                          locals)))])
+                           (printf "coloring for ~a is : ~a\n" label coloring)
                            (define s1 (set-count spilled-stack))
                            (define s2 (set-count spilled-root)) 
                            (set! spilled-root (mutable-set))
