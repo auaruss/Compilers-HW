@@ -1485,7 +1485,7 @@
                                               (+ a (+ b (+ c (+ d (+ e (+ f (+ g h))))))))
                                        (add8 0 1 1 1 1 1 1 35))))
 
-#;(define upto-alloc-reg
+(define upto-alloc-reg
   (build-interference
    (uncover-live
     (select-instructions
