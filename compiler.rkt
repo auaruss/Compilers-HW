@@ -1228,6 +1228,7 @@
 (define (instr-arg-varset arg)
   (match arg 
 	 [(Var v) (set v)]
+         [(Reg r) (set r)]
 	 [_ (list->set '())]))
 
 (define (instr-read-varset instr) 
@@ -1244,27 +1245,32 @@
      (set-union (instr-arg-varset e1) (instr-arg-varset e2))]
     [(Instr 'negq (list e1))
      (instr-arg-varset e1)]
+    [(Callq label)
+     (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
+          'rbx  'r12 'r13 'r14)]
     [(IndirectCallq e1)
-     (instr-arg-varset e1)]
+     (set-union (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
+                     'rbx  'r12 'r13 'r14) (instr-arg-varset e1))]
     [(TailJmp e1)
-     (instr-arg-varset e1)]
+     (set-union (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
+                     'rbx  'r12 'r13 'r14) (instr-arg-varset e1))]
     [_ (list->set '())]))
 
 (define (instr-written-varset instr)
   (match instr
-	 [(Instr 'cmpq (list e1 e2))
-	  (list->set '())]
-	 [(Instr op (list e1 e2))
-	  (instr-arg-varset e2)]
-	 [(Instr 'negq (list e1))
-	  (instr-arg-varset e1)]
-	 [_ (list->set '())]))
+    [(Instr 'cmpq (list e1 e2))
+     (list->set '())]
+    [(Instr op (list e1 e2))
+     (instr-arg-varset e2)]
+    [(Instr 'negq (list e1))
+     (instr-arg-varset e1)]
+    [_ (list->set '())]))
 
 (define (uncover-live-helper instr-ls live-after-set label)
   (cond
     [(null? instr-ls) (live-before-set-set! label live-after-set) (list live-after-set)]
     [else (let ([new-live-after-set (set-union (set-subtract live-after-set (instr-written-varset (car instr-ls))) (instr-read-varset (car instr-ls)))]) 
-	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set label) (list live-after-set)))]
+            (append (uncover-live-helper (cdr instr-ls) new-live-after-set label) (list live-after-set)))]
     ))
 
 (define (get-first-live ls)
