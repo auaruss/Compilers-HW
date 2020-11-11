@@ -1657,7 +1657,7 @@
   (format "~a:\n\taddq\t$~a, %rsp\n\t~a\n\tpopq\t%rbp\n\tretq"
           (label-name "conclusion") (+ 8 (align stacksize 16)) callee-reg-str-pop)) ;; stack-space
 
-(define (make-main stack-size root-spills)
+(define (make-main stack-size root-spills main)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
@@ -1665,7 +1665,9 @@
                          (Instr 'movq (list (Reg 'rsp) (Reg 'rbp))))
                    (map (lambda (x) (Instr 'pushq (list x))) (list (Reg 'rbx) (Reg 'r12) (Reg 'r13) (Reg 'r14))) 
                    (list (Instr 'subq (list (Imm stack-adjust) (Reg 'rsp)))) 
-                   (initialize-garbage-collector root-spills)
+                   (if main 
+		       (initialize-garbage-collector root-spills)
+		       (dont-initialize-garbage-collector root-spills))
                    (list (Jmp 'start))))))
 
 (define (make-conclusion stack-size root-spills)
@@ -1687,6 +1689,10 @@
                 (Callq 'initialize)
                 (Instr 'movq (list (Global 'rootstack_begin) (Reg 'r15))))
 	  (for/list ([i root-spills]) (Instr 'movq (list (Imm 0) (Deref 'r15 (* i 8)))))
+	  (list (Instr 'addq (list (Imm (* 8 root-spills)) (Reg 'r15))))))
+
+(define (dont-initialize-garbage-collector root-spills)
+  (append (for/list ([i root-spills]) (Instr 'movq (list (Imm 0) (Deref 'r15 (* i 8)))))
 	  (list (Instr 'addq (list (Imm (* 8 root-spills)) (Reg 'r15))))))
 
 (define (stringify-arg arg)
@@ -1775,8 +1781,9 @@
                         (define new-alist (cons (cons (string->symbol (string-append (symbol->string label) "conclusion"))
                                                       (make-conclusion (dict-ref info 'stack-space)
                                                                        (cdr (dict-ref info 'num-spills)))) 
-                                                (cons (cons label (make-main (dict-ref info 'stack-space)
-                                                                             (cdr (dict-ref info 'num-spills)))) 
+                                                (cons (cons label (if (equal? label 'main)
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #t)
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #f))) 
                                                       alist)))
                         (format "~a"
                                 (foldr string-append ""
