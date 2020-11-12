@@ -1454,13 +1454,13 @@
 
 ;; A SatSet is a set of nats (colors)
 
-;; color-graph : InterferenceGraph -> [Hash Var SatSet] -> [(Var . Nat)]
+;; color-graph : InterferenceGraph -> [Hash Var SatSet] -> [(Var . Nat)] -> [(Var . Nat)]
 ;; takes an unweighted/undirected intereference graph and a mutable hashtable of vars to saturation sets
-;; in program, returns mapping from var to color (Nat)
+;; in program, returns mapping from var to color (Nat) using an accumulator
 
-(define (color-graph ig hash locals)
+(define (color-graph ig hash locals coloring)
   (if (hash-empty? hash)
-      empty
+      coloring
       (let* ([maxsat (get-longest-val hash)]
              [maxsat-vert (hash-key hash maxsat)]
              [adj-verts (if (has-vertex? ig maxsat-vert)
@@ -1474,7 +1474,8 @@
                                 hash))
                       adj-verts)
         (hash-remove! hash maxsat-vert)
-        (cons `(,maxsat-vert . ,col) (color-graph ig hash locals)))))
+        (color-graph ig hash (dict-set coloring maxsat-vert col))
+        #;(cons `(,maxsat-vert . ,col) (color-graph ig hash locals)))))
 
 ;; allocate-registers-exp : pseudo-x86 InterferenceGraph [Var] [Var . Home] -> pseudo-x86
 ;; takes in pseudo-x86 exp, intereference graph, and list of vars, returns
@@ -1559,6 +1560,58 @@
 
 ;; need to store num-spills/stack-space in def info
 
+#;(define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
+                            (7 . r10) (8 . r12) (9 . r13) (10 . r14)))
+
+; reg-sym? : Symbol -> Bool
+; returns true iff the given symbol is a register name that can be in interference graph
+
+(define (reg-sym? sym)
+  (or (symbol=? sym 'rbx)
+      (symbol=? sym 'rcx)
+      (symbol=? sym 'rdx)
+      (symbol=? sym 'rsi)
+      (symbol=? sym 'rdi)
+      (symbol=? sym 'r8)
+      (symbol=? sym 'r9)
+      (symbol=? sym 'r10)
+      (symbol=? sym 'r12)
+      (symbol=? sym 'r13)
+      (symbol=? sym 'r14)))
+
+; color-reg : RegSym -> [Var . Nat]
+; colors the register symbol to the correct REGCOL
+
+(define (color-reg reg)
+  (cond [(symbol=? sym 'rbx) `(,reg . 0)]
+        [(symbol=? sym 'rcx) `(,reg . 1)]
+        [(symbol=? sym 'rdx) `(,reg . 2)]
+        [(symbol=? sym 'rsi) `(,reg . 3)]
+        [(symbol=? sym 'rdi) `(,reg . 4)]
+        [(symbol=? sym 'r8)  `(,reg . 5)]
+        [(symbol=? sym 'r9)  `(,reg . 6)]
+        [(symbol=? sym 'r10) `(,reg . 7)]
+        [(symbol=? sym 'r12) `(,reg . 8)]
+        [(symbol=? sym 'r13) `(,reg . 9)]
+        [(symbol=? sym 'r14) `(,reg . 10)]))
+
+; pre-process-reg-hash : InterferenceGraph -> Hash[Var -> SatSet]
+; makes the initial hash table that adds reg colors to adjacent vars
+
+(define (pre-process-reg-hash ig coloring)
+  (let* ([hash (make-hash)]
+         [reg-verts (filter reg-sym? (get-vertices ig))]
+         [reg-verts-neighbors (foldr (λ (f r) (append (get-neighbors f) r)) reg-verts)]
+         [adj-to-reg-verts (filter (λ (v) (not (reg-sym? v))) reg-verts-neighbors)])
+    (for-each (λ (vert) (for-each (λ (neighbor)
+                                    (if (= -1 (dict-ref coloring neighbor))
+                                        hash
+                                        (hash-set! hash vert
+                                                   (cons (dict-ref coloring neighbor)
+                                                         (hash-ref hash vert)))))
+                                  (get-neighbors vert)))
+              adj-to-reg-verts)))
+
 (define (allocate-registers p)
   (match p
     [(ProgramDefs info ds)
@@ -1566,16 +1619,22 @@
                       (match d
                         [(Def label paramtypes returntype info alist)
                          (let* ([locals (dict-ref info 'locals)]
-                                [coloring (color-graph (dict-ref info 'conflicts)
-                                                       (make-hash (map (λ (a) `(,(car a) . ()))
-                                                                       locals))
-                                                       locals)]
+                                [ig (dict-ref info 'conflicts)]
+                                [pre-color (map (λ (vert) (if (reg-sym? vert)
+                                                              (color-reg vert)
+                                                              `(,vert . -1)))
+                                                (get-vertices ig))]
+                                [pre-process-hash (pre-process-reg-hash ig pre-color)]
+                                [coloring (color-graph ig
+                                                       pre-process-hash
+                                                       locals
+                                                       pre-color)]
                                 [new-alist (for/list ([pr alist]) (cons (car pr)
                                                                         (allocate-registers-exp
                                                                          (cdr pr)
                                                                          coloring
                                                                          locals)))])
-                           (printf "coloring for ~a is : ~a\n" label coloring)
+                           #;(printf "coloring for ~a is : ~a\n" label coloring)
                            (define s1 (set-count spilled-stack))
                            (define s2 (set-count spilled-root)) 
                            (set! spilled-root (mutable-set))
