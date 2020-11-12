@@ -9,7 +9,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'abstract-syntax)
+(AST-output-syntax 'concrete-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -23,6 +23,10 @@
                                        (define (add1 [x : Integer]) : Integer
                                          (+ x 1))
                                        (vector-ref (map-vec add1 (vector 0 41)) 1))))
+
+(define lecture-ex (parse-program `(program '() (define (add  [x : Integer] [y : Integer]) : Integer
+                                                  (+ x y))
+                                            (add 40 2))))
 ;;(define r4_01prog (ProgramDefsExp '() r4_01))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -983,8 +987,6 @@
 
 #;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))))))
 
-;; new select-instructions for R3
-
 ; atm? : c0exp -> bool
 
 (define (atm? c0exp)
@@ -1041,17 +1043,6 @@
          [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
          [res (bitwise-ior type-num type-len)])
     res))
-
-#;(define uptosel-ins
-  (uncover-locals
-   (explicate-control
-    (remove-complex-opera*
-     (expose-allocation
-      (limit-functions
-       (reveal-functions
-        (uniquify
-         (shrink
-          (type-check-R4 r4_01))))))))))
 
 ;; argument registers in order:
 (define ARGREGS '(rdi rsi rdx rcx r8 r9))
@@ -1189,16 +1180,18 @@
 (define (select-instructions p)
   (match p
     [(ProgramDefs info ds)
-     (define new-ds (for/list ([d ds]) (match d
-                                         [(Def label paramtypes returntype info alist)
-                                          (define args (for/list ([param paramtypes]) (match param
-                                                                                        [`(,v : ,t)
-                                                                                         (Var v)])))
-                                          (define new-alist (for/list ([p alist])
-                                                              (cons (car p) (Block '() (append (assign-regs-args args 0) (sel-ins-tail (cdr p) label))))))
-                                          (Def label '() returntype
-                                               (dict-set info 'num-params (length paramtypes))
-                                               new-alist)])))
+     (define new-ds (for/list ([d ds])
+                      (match d
+                        [(Def label paramtypes returntype info alist)
+                         (define args (for/list ([param paramtypes])
+                                        (match param
+                                          [`(,v : ,t)
+                                           (Var v)])))
+                         (define new-alist (for/list ([p alist])
+                                             (cons (car p) (Block '() (append (assign-regs-args args 0) (sel-ins-tail (cdr p) label))))))
+                         (Def label '() returntype
+                              (dict-set info 'num-params (length paramtypes))
+                              new-alist)])))
      (ProgramDefs info new-ds)]))
 
 
@@ -1225,12 +1218,9 @@
         [(Jmp label2) (if (not (member label2 conclusions))
                           (begin
                             (add-directed-edge! globalCFG label1 label2)
-                            (add-global-CFG-edges label1 (cdr ls) conclusions)
-                            )
+                            (add-global-CFG-edges label1 (cdr ls) conclusions))
                          (add-global-CFG-edges label1 (cdr ls) conclusions) )]
-        [_ (add-global-CFG-edges label1 (cdr ls) conclusions)]
-        )]
-    ))
+        [_ (add-global-CFG-edges label1 (cdr ls) conclusions)])]))
 
 ;; turn association list of blocks in CFG into graph
 ;; then reverse topo sort said graph, uncover-live that sorted list
@@ -1238,6 +1228,7 @@
 (define (instr-arg-varset arg)
   (match arg 
 	 [(Var v) (set v)]
+         [(Reg r) (set r)]
 	 [_ (list->set '())]))
 
 (define (instr-read-varset instr) 
@@ -1254,42 +1245,44 @@
      (set-union (instr-arg-varset e1) (instr-arg-varset e2))]
     [(Instr 'negq (list e1))
      (instr-arg-varset e1)]
+    [(Callq label)
+     (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
+          'rbx  'r12 'r13 'r14)]
     [(IndirectCallq e1)
-     (instr-arg-varset e1)]
+     (set-union (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
+                     'rbx  'r12 'r13 'r14) (instr-arg-varset e1))]
     [(TailJmp e1)
-     (instr-arg-varset e1)]
+     (set-union (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
+                     'rbx  'r12 'r13 'r14) (instr-arg-varset e1))]
     [_ (list->set '())]))
 
 (define (instr-written-varset instr)
   (match instr
-	 [(Instr 'cmpq (list e1 e2))
-	  (list->set '())]
-	 [(Instr op (list e1 e2))
-	  (instr-arg-varset e2)]
-	 [(Instr 'negq (list e1))
-	  (instr-arg-varset e1)]
-	 [_ (list->set '())]))
+    [(Instr 'cmpq (list e1 e2))
+     (list->set '())]
+    [(Instr op (list e1 e2))
+     (instr-arg-varset e2)]
+    [(Instr 'negq (list e1))
+     (instr-arg-varset e1)]
+    [_ (list->set '())]))
 
 (define (uncover-live-helper instr-ls live-after-set label)
   (cond
     [(null? instr-ls) (live-before-set-set! label live-after-set) (list live-after-set)]
     [else (let ([new-live-after-set (set-union (set-subtract live-after-set (instr-written-varset (car instr-ls))) (instr-read-varset (car instr-ls)))]) 
-	  (append (uncover-live-helper (cdr instr-ls) new-live-after-set label) (list live-after-set)))]
+            (append (uncover-live-helper (cdr instr-ls) new-live-after-set label) (list live-after-set)))]
     ))
 
 (define (get-first-live ls)
   (match ls
     ['() (list->set '())]
-    [else (set-union (live-before-set (car ls)) (get-first-live (cdr ls)))]
-    )
-  )
+    [else (set-union (live-before-set (car ls)) (get-first-live (cdr ls)))]))
 
 (define (find-instructions label es)
   (if (eq? label (car (car es))) 
       (match (cdr (car es))
         [(Block b-info ls) ls])
-      (find-instructions label (cdr es)))
-  )
+      (find-instructions label (cdr es))))
 
 (define (sort-blocks ordered-vertices es)
   (for/list ([label ordered-vertices]) 
@@ -1314,16 +1307,11 @@
                                           (Def label paramtypes rt info (filter (λ (v) (not (equal? v '()))) (for/list ([pr new-blocklist]) (if (equal? (function-label (car pr)) label)
                                                                                                                                                 pr
                                                                                                                                                 '()))))])))
-     (ProgramDefs info new-ds)]
-    ))
-
+     (ProgramDefs info new-ds)]))
 
 #;(uncover-live (select-instructions (uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 jeremytest)))))))))))
 
 ;; build-interference
-
-;; movzbq is similar to movq
-;; consider register al the same as rax
 
 (define caller-save-for-alloc^ '(al rax rdx rcx rsi rdi r8 r9 r10 r11))
 (define callee-save-for-alloc^ '(rsp rbp rbx r12 r13 r14 r15))
@@ -1345,6 +1333,8 @@
     [(JmpIf cc label) (set)]
     [(Jmp label) (set)]
     [(Callq f) (set)]
+    [(TailJmp arg) (set)]
+    [(IndirectCallq arg) (set)]
     [else (error "write-vars unmatched" instr)]))
 
 (define (build-interference-instr^ live-after g locals)
@@ -1360,9 +1350,11 @@
        ast]
       [(or (IndirectCallq f) (Callq f))
        (define vector-vars
-	 (filter (lambda (x) (not (equal? x '()))) (for/list ([e locals]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '()))))
+         (filter (lambda (x) (not (equal? x '())))
+                 (for/list ([e locals]) (if (and (list? (cdr e))
+                                                 (equal? 'Vector (car (cdr e)))) (car e) '()))))
        #;(define vector-vars
-               (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
+           (filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (eqv? 'Vector (caadr x)) (car x))) locals))
        (for ([v live-after])
          (for ([u caller-save-for-alloc^])
            (if (equal? v u)
@@ -1388,27 +1380,30 @@
   (match ast
     [(Block info ss)
      (let* ([lives info]
-            [live-afters (cdr lives)]
+            [live-afters lives]
             [new-ss (for/list ([inst ss] [live-after live-afters])
                       ((build-interference-instr^ live-after g locals) inst))]
             [new-info '()])
        (Block info ss))]))
 
-(define (build-interference-cfg locals)
-  (λ (def) 
-    (let ([g (undirected-graph '())])
-      (for ([v locals]) (add-vertex! g v))
-      (cons (Def-name def)
-            (for/list ([(label block) (in-dict (Def-body def))])
-              (cons label (build-interference-block^ block g locals)))))))
+(define build-interference-cfg
+  (λ (def)
+    (match def
+      [(Def label paramtypes returntype info alist)
+       (define locals (dict-ref info 'locals))
+       (let ([g (undirected-graph '())])
+         (for ([v locals]) (add-vertex! g (car v)))
+         (for/list ([(label block) (in-dict alist)])
+                          (build-interference-block^ block g locals))
+         (Def label paramtypes returntype
+              (dict-set info 'conflicts g)
+              alist))])))
 
 (define (build-interference ast)
   (match ast
     [(ProgramDefs info defns)
-     (define locals (dict-ref info 'locals))
-     (define interference-graphs (map (build-interference-cfg locals) defns))
-     (define new-info (dict-set info 'conflicts interference-graphs))
-     (ProgramDefs new-info defns)]))
+     (define new-ds (map build-interference-cfg defns))
+     (ProgramDefs info new-ds)]))
 
 ;; allocate-registers
 
@@ -1442,8 +1437,7 @@
 	       (and (odd? cand) 
 		    (not (vector-type? locals v)))))
       cand
-      (choose-least satset (add1 cand) locals v)
-      ))
+      (choose-least satset (add1 cand) locals v)))
 
 ;; hash-key : [Hash Key Val] Val -> Key
 ;; returns the (a) key that maps to given val
@@ -1463,35 +1457,6 @@
 ;; color-graph : InterferenceGraph -> [Hash Var SatSet] -> [(Var . Nat)]
 ;; takes an unweighted/undirected intereference graph and a mutable hashtable of vars to saturation sets
 ;; in program, returns mapping from var to color (Nat)
-
-;; interference graph from book example
-(define ig1 (unweighted-graph/undirected '((t z) (z y) (z w) (y w) (x w) (w v))))
-(define h1 (make-hash '((t . ()) (z . ()) (y . ()) (w . ()) (x . ()) (v . ()))))
-(define testhash (hash 't '(a e w) 'z '() 'y '(w q f f d) 'w '() 'x '(z a) 'v '(e)))
-
-#;(define ch3ig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify ch3program))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-#;(define r1-11ig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify r1-11prog))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-#;(define r1-12ig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify r1-12prog))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-#;(define asdig
-  (match (build-interference (uncover-live (select-instructions
-                                            (explicate-control (remove-complex-opera* (uniquify asdp))))))
-    [(Program info CFG) (dict-ref info 'conflicts)]))
-
-
-
-
 
 (define (color-graph ig hash locals)
   (if (hash-empty? hash)
@@ -1516,17 +1481,36 @@
 ;; a pseudo-x86 exp with allocated registers according to color-graph
 
 (define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
-                            (7 . r10) #;(8 . r11) (8 . r12) (9 . r13) (10 . r14)))
+                            (7 . r10) (8 . r12) (9 . r13) (10 . r14)))
 
 
 (define spilled-root (mutable-set))
 (define spilled-stack (mutable-set))
+
+(define r4_02 (parse-program `(program '()  (define (add8  [a : Integer] [b : Integer] [c : Integer] [d : Integer] [e : Integer] [f : Integer] [g : Integer] [h : Integer])     : Integer
+                                              (+ a (+ b (+ c (+ d (+ e (+ f (+ g h))))))))
+                                       (add8 0 1 1 1 1 1 1 35))))
+
+(define upto-alloc-reg
+  (build-interference
+   (uncover-live
+    (select-instructions
+     (uncover-locals
+      (explicate-control
+       (remove-complex-opera*
+        (expose-allocation
+         (limit-functions
+          (reveal-functions
+           (uniquify
+            (shrink
+             (type-check-R4 r4_02)))))))))))))
 
 ;; change sig to
 ;; allocate-registers-exp : pseudo-x86 [Var . Nat] -> pseudo-x86
 
 (define (allocate-registers-exp e coloring locals)
     (match e
+      [(FunRef lbl) (FunRef lbl)]
       [(Reg reg) (Reg reg)]
       [(Imm int) (Imm int)]
       [(Deref v i) (Deref v i)]
@@ -1545,6 +1529,8 @@
 			  (let ([location (* -8 (quotient (- colnum 10) 2))])
                           (set-add! spilled-stack location)
                           (Deref 'rbp (- location 32)))))))]
+      [(Instr 'leaq (list arg reg)) (Instr 'leaq (list (allocate-registers-exp arg coloring locals)
+                                                       (allocate-registers-exp reg coloring locals)))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
                                                      (allocate-registers-exp e2 coloring locals)))]
       [(Instr 'subq (list e1 e2)) (Instr 'subq (list (allocate-registers-exp e1 coloring locals)
@@ -1560,6 +1546,8 @@
       [(Instr 'set (list cc e)) (Instr 'set (list cc
                                                      (allocate-registers-exp e coloring locals)))]
       [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 coloring locals)))]
+      [(IndirectCallq lbl) (IndirectCallq (allocate-registers-exp lbl coloring locals))]
+      [(TailJmp arg) (TailJmp (allocate-registers-exp arg coloring locals))]
       [(Callq l) (Callq l)]
       [(Retq) (Retq)]
       [(Global var) (Global var)]
@@ -1569,42 +1557,35 @@
       [(JmpIf cc label) (JmpIf cc label)]
       [(Block info es) (Block info (for/list ([e es]) (allocate-registers-exp e coloring locals)))]))
 
+;; need to store num-spills/stack-space in def info
+
 (define (allocate-registers p)
   (match p
-    [(Program info (CFG es))
-     (let* ([coloring (color-graph (dict-ref info 'conflicts)
-                                  (make-hash (map (λ (a) `(,(car a) . ())) (dict-ref info 'locals))) (dict-ref info 'locals))]
-	    [es^ (for/list ([ls es]) (cons (car ls)
-                                           (allocate-registers-exp
-                                            (cdr ls)
-                                            coloring
-                                            (dict-ref info 'locals))
-                                           ))])
-       (define s1 (set-count spilled-stack))
-       (define s2 (set-count spilled-root)) 
-       (set! spilled-root (mutable-set))
-       (set! spilled-stack (mutable-set))
-       (Program (list (cons 'stack-space (* 8 s1) #;(let ([f (* 8 (- (if (> (length coloring) 0)
-                                                              (apply max (map (λ (assoc) (cdr assoc)) coloring))
-                                                              0) 11))])
-                                           (if (negative? f)
-                                               0
-                                               f #;(+ f (modulo f 16)))))
-                      (cons 'num-spills `(,s1 . ,s2))
-                )
-                (CFG 
-                 es^)))]))
-
-
-(define tuples-and-gc-prog (Program '() (Prim 'vector-ref (list (Prim 'vector-ref (list (Prim 'vector (list (Prim 'vector (list (Int 42))))) (Int 0))) (Int 0)))))
-#;(explicate-control (remove-complex-opera* (expose-allocation (uniquify (shrink (type-check-R3 tuples-and-gc-prog))))))
-
-;; Grant
+    [(ProgramDefs info ds)
+     (define new-ds (for/list ([d ds])
+                      (match d
+                        [(Def label paramtypes returntype info alist)
+                         (let* ([locals (dict-ref info 'locals)]
+                                [coloring (color-graph (dict-ref info 'conflicts)
+                                                       (make-hash (map (λ (a) `(,(car a) . ()))
+                                                                       locals))
+                                                       locals)]
+                                [new-alist (for/list ([pr alist]) (cons (car pr)
+                                                                        (allocate-registers-exp
+                                                                         (cdr pr)
+                                                                         coloring
+                                                                         locals)))])
+                           (printf "coloring for ~a is : ~a\n" label coloring)
+                           (define s1 (set-count spilled-stack))
+                           (define s2 (set-count spilled-root)) 
+                           (set! spilled-root (mutable-set))
+                           (set! spilled-stack (mutable-set))
+                           (define new-info (append (list (cons 'stack-space (* 8 s1))
+                                                          (cons 'num-spills `(,s1 . ,s2))) info))
+                           (Def label paramtypes returntype new-info new-alist))])))
+     (ProgramDefs info new-ds)]))
 
 ;; patch-instructions : psuedo-x86 -> x86
-
-;; fix cmpq with second arg as immediate
-;; fix movzbq target arg must be register (move stack var into reg for it)
 
 (define (patch-instructions-instr px86instr)
   (match px86instr
@@ -1659,21 +1640,9 @@
             (Def label paramtypes returntype info new-alist)])))
      (ProgramDefs info new-ds)]))
 
-;;TEST
-;;(patch-instructions (assign-homes (select-instructions (explicate-control r1program-let))))
-
-;;  (error "TODO: code goes here (patch-instructions)"))
-
-;; Grant/Sam
-
 (define r1-10 (Let 'x (Prim 'read '()) (Let 'y (Prim 'read '()) (Prim '+ (list (Var 'x) (Prim '- (list (Var 'y))))))))
 (define r1-10prog (Program '() r1-10))
 
-;;define x86prog (patch-instructions (assign-homes (select-instructions (explicate-control r1program-let)))))
-;x86prog
-
-;rsp  rbx r12 r13 r14 r15
-;
 (define callee-reg-str-push
   "\tpushq\t%rbx\n\tpushq\t%r12\n\tpushq\t%r13\n\tpushq\t%r14\n\tpushq\t%r15")
 ;
@@ -1688,24 +1657,26 @@
   (format "~a:\n\taddq\t$~a, %rsp\n\t~a\n\tpopq\t%rbp\n\tretq"
           (label-name "conclusion") (+ 8 (align stacksize 16)) callee-reg-str-pop)) ;; stack-space
 
-(define (make-main stack-size root-spills)
+(define (make-main stack-size root-spills main)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
            (append (list (Instr 'pushq (list (Reg 'rbp)))
                          (Instr 'movq (list (Reg 'rsp) (Reg 'rbp))))
-                   (map (lambda (x) (Instr 'pushq (list x))) (list (Reg 'rbx) (Reg 'r12) (Reg 'r13) (Reg 'r14) #;(Reg 'r15))) 
+                   (map (lambda (x) (Instr 'pushq (list x))) (list (Reg 'rbx) (Reg 'r12) (Reg 'r13) (Reg 'r14))) 
                    (list (Instr 'subq (list (Imm stack-adjust) (Reg 'rsp)))) 
-                   (initialize-garbage-collector root-spills)
+                   (if main 
+		       (initialize-garbage-collector root-spills)
+		       (dont-initialize-garbage-collector root-spills))
                    (list (Jmp 'start))))))
 
-(define (make-conclusion stack-size root-spills ret)
+(define (make-conclusion stack-size root-spills)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
            (append (list (Instr 'subq (list (Imm (* 8 root-spills)) (Reg 'r15)))
                          (Instr 'addq (list (Imm stack-adjust) (Reg 'rsp))))
-                   (map (lambda (x) (Instr 'popq (list x))) (list #;(Reg 'r15) (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx))) 
+                   (map (lambda (x) (Instr 'popq (list x))) (list (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx))) 
                    (list (Instr 'popq (list (Reg 'rbp)))
                          (Retq))))))
 
@@ -1718,6 +1689,10 @@
                 (Callq 'initialize)
                 (Instr 'movq (list (Global 'rootstack_begin) (Reg 'r15))))
 	  (for/list ([i root-spills]) (Instr 'movq (list (Imm 0) (Deref 'r15 (* i 8)))))
+	  (list (Instr 'addq (list (Imm (* 8 root-spills)) (Reg 'r15))))))
+
+(define (dont-initialize-garbage-collector root-spills)
+  (append (for/list ([i root-spills]) (Instr 'movq (list (Imm 0) (Deref 'r15 (* i 8)))))
 	  (list (Instr 'addq (list (Imm (* 8 root-spills)) (Reg 'r15))))))
 
 (define (stringify-arg arg)
@@ -1735,9 +1710,13 @@
      (define st (stringify-arg arg))
      (format "callq *~a" st)]
     [(TailJmp arg)
-     (define popframe "pop that frame here")
+     (define popframe
+       (map (lambda (x) (Instr 'popq (list x)))
+            (list (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx) (Reg 'rbp))))
+     (define popstring
+       (foldr (λ (inst rec) (string-append (stringify-in inst) "\n" rec)) "" popframe))
      (define st (stringify-arg arg))
-     (format "~ajmp *~a" popframe st)]
+     (format "~ajmp\t*~a" popstring st)]
     [(Instr 'leaq (list arg reg))
      (define st1 (stringify-arg arg))
      (define st2 (stringify-arg reg))
@@ -1790,42 +1769,29 @@
 (define (format-x86 ins)
   (foldr (λ (f r) (string-append "\t" f "\n" r)) "" (map stringify-in ins)))
      
-     ;(format "~a:\n\t" label)
+;(format "~a:\n\t" label)
 
 ;; print-x86 : x86 -> string
 (define (print-x86 p)
   (match p
     [(ProgramDefs info ds)
-     (define new-ds
-       (for/list ([d ds])
-         (match d [(Def label paramtypes returntype info blocks)
-                   ...])))]
-    #;[(Program info (CFG es))
-       (define new-es (cons (cons 'conclusion (make-conclusion (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
-                            (cons (cons 'main (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)))) 
-				es)))
-     (format "~a"
-             (foldr string-append ""
-                    (for/list ([pair new-es])
-                      (string-append (if (equal? (car pair) 'main) (format "\n\t.globl ~a\n~a" (label-name 'main) (label-name 'main)) (label-name (car pair))) ":\n" (format-x86 (Block-instr* (cdr pair))))))
-             )]))
+     (foldr string-append ""
+            (for/list ([d ds])
+              (match d [(Def label paramtypes returntype info alist)
+                        (define new-alist (cons (cons (string->symbol (string-append (symbol->string label) "conclusion"))
+                                                      (make-conclusion (dict-ref info 'stack-space)
+                                                                       (cdr (dict-ref info 'num-spills)))) 
+                                                (cons (cons label (if (equal? label 'main)
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #t)
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #f))) 
+                                                      alist)))
+                        (format "~a"
+                                (foldr string-append ""
+                                       (for/list ([pair new-alist])
+                                         (string-append (if (equal? (car pair) label) ;; .align 16 ?
+                                                            (format "\n\t.globl ~a\n~a"
+                                                                    (label-name label)
+                                                                    (label-name label))
+                                                            (label-name (car pair)))
+                                                        ":\n" (format-x86 (Block-instr* (cdr pair)))))))])))]))
 
-(define r2_58prog (Program '() (If (Prim '<= (list (Int 2) (Int 2))) (Int 42) (Int 0))))
-
-#;(define testprinthw4 (print-x86
-                      (patch-instructions
-                       (allocate-registers
-                        (build-interference
-                         (uncover-live
-                          (select-instructions
-                           (uncover-locals
-                            (explicate-control
-                             (remove-complex-opera*
-                              (expose-allocation
-                               (uniquify
-                                (shrink
-                                 (type-check-R3 hw4prog))))))))))))))
-
-;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify (Program '() (Prim 'read (list)))))))))))))
-;;(printf (print-x86 (patch-instructions (allocate-registers (build-interference (uncover-live (select-instructions (explicate-control (remove-complex-opera* (uniquify ch3program))))))))))
-;;Grant/Sam
