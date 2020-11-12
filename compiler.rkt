@@ -9,7 +9,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'concrete-syntax)
+(AST-output-syntax 'abstract-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -1222,13 +1222,43 @@
                          (add-global-CFG-edges label1 (cdr ls) conclusions) )]
         [_ (add-global-CFG-edges label1 (cdr ls) conclusions)])]))
 
+; reg-sym? : Symbol -> Bool
+; returns true iff the given symbol is a register name that can be in interference graph
+
+(define (reg-sym? sym)
+  (or (symbol=? sym 'rbp)
+      (symbol=? sym 'rsp)
+      (symbol=? sym 'al)
+      (symbol=? sym 'rax)
+      (symbol=? sym 'r11)
+      (symbol=? sym 'r15)
+      (symbol=? sym 'rbx)
+      (symbol=? sym 'rcx)
+      (symbol=? sym 'rdx)
+      (symbol=? sym 'rsi)
+      (symbol=? sym 'rdi)
+      (symbol=? sym 'r8)
+      (symbol=? sym 'r9)
+      (symbol=? sym 'r10)
+      (symbol=? sym 'r12)
+      (symbol=? sym 'r13)
+      (symbol=? sym 'r14)))
+
 ;; turn association list of blocks in CFG into graph
 ;; then reverse topo sort said graph, uncover-live that sorted list
 
 (define (instr-arg-varset arg)
   (match arg 
 	 [(Var v) (set v)]
-         [(Reg r) (set r)]
+         [(Reg r) (if (and (reg-sym? r)
+                           (not (symbol=? r 'rax))
+                           (not (symbol=? r 'r11))
+                           (not (symbol=? r 'rbp))
+                           (not (symbol=? r 'rsp))
+                           (not (symbol=? r 'al))
+                           (not (symbol=? r 'r15)))
+                      (set r)
+                      (set))]
 	 [_ (list->set '())]))
 
 (define (instr-read-varset instr) 
@@ -1321,7 +1351,7 @@
     [(Var x) (set x)]
     [(Reg r) (set r)]
     [(Deref r i) (set r)]
-    [(Global v) (set v)]
+    [(Global v) (set)#;(set v)]
     [(Imm n) (set)]
     [else (error "free vars, unhandled" arg)]))
 
@@ -1474,7 +1504,7 @@
                                 hash))
                       adj-verts)
         (hash-remove! hash maxsat-vert)
-        (color-graph ig hash (dict-set coloring maxsat-vert col))
+        (color-graph ig hash locals (dict-set coloring maxsat-vert col))
         #;(cons `(,maxsat-vert . ,col) (color-graph ig hash locals)))))
 
 ;; allocate-registers-exp : pseudo-x86 InterferenceGraph [Var] [Var . Home] -> pseudo-x86
@@ -1492,7 +1522,7 @@
                                               (+ a (+ b (+ c (+ d (+ e (+ f (+ g h))))))))
                                        (add8 0 1 1 1 1 1 1 35))))
 
-(define upto-alloc-reg
+#;(define upto-alloc-reg
   (build-interference
    (uncover-live
     (select-instructions
@@ -1504,7 +1534,7 @@
           (reveal-functions
            (uniquify
             (shrink
-             (type-check-R4 r4_02)))))))))))))
+             (type-check-R4 r4_01)))))))))))))
 
 ;; change sig to
 ;; allocate-registers-exp : pseudo-x86 [Var . Nat] -> pseudo-x86
@@ -1524,6 +1554,7 @@
                           (set-add! spilled-root location)
                           (Deref 'r15 location)))))
                   (let ([colnum (dict-ref coloring v)])
+                    #;(printf "coloring for ~a is ~a\n" v coloring)
                     (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin
@@ -1560,40 +1591,27 @@
 
 ;; need to store num-spills/stack-space in def info
 
-#;(define REGCOLS '((0 . rbx) (1 . rcx) (2 . rdx) (3 . rsi) (4 . rdi) (5 . r8) (6 . r9)
-                            (7 . r10) (8 . r12) (9 . r13) (10 . r14)))
-
-; reg-sym? : Symbol -> Bool
-; returns true iff the given symbol is a register name that can be in interference graph
-
-(define (reg-sym? sym)
-  (or (symbol=? sym 'rbx)
-      (symbol=? sym 'rcx)
-      (symbol=? sym 'rdx)
-      (symbol=? sym 'rsi)
-      (symbol=? sym 'rdi)
-      (symbol=? sym 'r8)
-      (symbol=? sym 'r9)
-      (symbol=? sym 'r10)
-      (symbol=? sym 'r12)
-      (symbol=? sym 'r13)
-      (symbol=? sym 'r14)))
-
 ; color-reg : RegSym -> [Var . Nat]
 ; colors the register symbol to the correct REGCOL
 
 (define (color-reg reg)
-  (cond [(symbol=? sym 'rbx) `(,reg . 0)]
-        [(symbol=? sym 'rcx) `(,reg . 1)]
-        [(symbol=? sym 'rdx) `(,reg . 2)]
-        [(symbol=? sym 'rsi) `(,reg . 3)]
-        [(symbol=? sym 'rdi) `(,reg . 4)]
-        [(symbol=? sym 'r8)  `(,reg . 5)]
-        [(symbol=? sym 'r9)  `(,reg . 6)]
-        [(symbol=? sym 'r10) `(,reg . 7)]
-        [(symbol=? sym 'r12) `(,reg . 8)]
-        [(symbol=? sym 'r13) `(,reg . 9)]
-        [(symbol=? sym 'r14) `(,reg . 10)]))
+  (cond [(symbol=? reg 'rax) `(,reg . -2)]
+        [(symbol=? reg 'r11) `(,reg . -2)]
+        [(symbol=? reg 'r15) `(,reg . -2)]
+        [(symbol=? reg 'rbp) `(,reg . -2)]
+        [(symbol=? reg 'rsp) `(,reg . -2)]
+        [(symbol=? reg 'al)  `(,reg . -2)]
+        [(symbol=? reg 'rbx) `(,reg . 0)]
+        [(symbol=? reg 'rcx) `(,reg . 1)]
+        [(symbol=? reg 'rdx) `(,reg . 2)]
+        [(symbol=? reg 'rsi) `(,reg . 3)]
+        [(symbol=? reg 'rdi) `(,reg . 4)]
+        [(symbol=? reg 'r8)  `(,reg . 5)]
+        [(symbol=? reg 'r9)  `(,reg . 6)]
+        [(symbol=? reg 'r10) `(,reg . 7)]
+        [(symbol=? reg 'r12) `(,reg . 8)]
+        [(symbol=? reg 'r13) `(,reg . 9)]
+        [(symbol=? reg 'r14) `(,reg . 10)]))
 
 ; pre-process-reg-hash : InterferenceGraph -> Hash[Var -> SatSet]
 ; makes the initial hash table that adds reg colors to adjacent vars
@@ -1601,16 +1619,20 @@
 (define (pre-process-reg-hash ig coloring)
   (let* ([hash (make-hash)]
          [reg-verts (filter reg-sym? (get-vertices ig))]
-         [reg-verts-neighbors (foldr (λ (f r) (append (get-neighbors f) r)) reg-verts)]
+         [reg-verts-neighbors (foldr (λ (f r) (append (get-neighbors ig f) r)) empty reg-verts)]
          [adj-to-reg-verts (filter (λ (v) (not (reg-sym? v))) reg-verts-neighbors)])
-    (for-each (λ (vert) (for-each (λ (neighbor)
-                                    (if (= -1 (dict-ref coloring neighbor))
-                                        hash
-                                        (hash-set! hash vert
-                                                   (cons (dict-ref coloring neighbor)
-                                                         (hash-ref hash vert)))))
-                                  (get-neighbors vert)))
-              adj-to-reg-verts)))
+    (for-each (λ (vert)
+                (for-each (λ (neighbor)
+                            (if (= -1 (dict-ref coloring neighbor))
+                                hash
+                                (hash-set! hash vert
+                                           (cons (dict-ref coloring neighbor)
+                                                 (if (hash-has-key? hash vert)
+                                                     (hash-ref hash vert)
+                                                     empty)))))
+                          (get-neighbors ig vert)))
+              adj-to-reg-verts)
+    hash))
 
 (define (allocate-registers p)
   (match p
@@ -1625,10 +1647,16 @@
                                                               `(,vert . -1)))
                                                 (get-vertices ig))]
                                 [pre-process-hash (pre-process-reg-hash ig pre-color)]
-                                [coloring (color-graph ig
+                                [_ (for-each (λ (v) (if (or (hash-has-key? pre-process-hash v)
+                                                            (reg-sym? v))
+                                                        'asdf
+                                                        (hash-set! pre-process-hash v '()))) (get-vertices ig))]
+                                [coloring (begin
+                                            #;(printf "hash: ~a\n" pre-process-hash)
+                                            (color-graph ig
                                                        pre-process-hash
                                                        locals
-                                                       pre-color)]
+                                                       pre-color))]
                                 [new-alist (for/list ([pr alist]) (cons (car pr)
                                                                         (allocate-registers-exp
                                                                          (cdr pr)
