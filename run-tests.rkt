@@ -11,8 +11,8 @@
 #;(require "interp-C2.rkt")
 (require "interp.rkt")
 (require "compiler.rkt")
-(AST-output-syntax 'abstract-syntax)
-(debug-level 0)
+(AST-output-syntax 'concrete-syntax)
+(debug-level 1)
 ;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
@@ -82,7 +82,7 @@
      ("uncover live" ,uncover-live ,interp-pseudo-x86-3)
      ("build interference" ,build-interference ,interp-pseudo-x86-3)
      ("allocate registers" ,allocate-registers ,interp-x86-3)
-     #;("patch instructions" ,patch-instructions ,interp-x86-3)
+     ("patch instructions" ,patch-instructions ,interp-x86-3)
      #;("print x86" ,print-x86 #f)
      ))
 

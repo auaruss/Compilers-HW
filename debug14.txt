@@ -1,0 +1,1705 @@
+type checker output: @ utilities.rkt:1472
+(strip-has-type tsexp):
+functions:
+(define (minus  [n : Integer] [m : Integer]) : Integer
+   (+ n (- m))
+)(define (zero  [x : Integer]) : (Vector)
+    (if (eq? x 0)
+       (vector)
+       (zero (minus (vector-ref (vector x) 0) 1))
+    )
+ )(define (one  [x : Integer]) : (Vector (Vector) Integer)
+     (if (eq? x 0)
+        (vector (zero 20) 42)
+        (one (minus (vector-ref (vector x) 0) 1))
+     )
+  )(define (two  [x : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      (if (eq? x 0)
+         (vector (zero 20) 42 (one 20))
+         (two (minus (vector-ref (vector x) 0) 1))
+      )
+   )(define (three  [x : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       (if (eq? x 0)
+          (vector (zero 20) 42 (one 20) (two 20))
+          (three (minus (vector-ref (vector x) 0) 1))
+       )
+    )
+program:
+(vector-ref (vector-ref (vector-ref (vector-ref (vector (zero 20) 42 (one 20) (two 20) (three 20)) 4) 3) 2) 1)
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: shrink @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus  [n : Integer] [m : Integer]) : Integer
+   (+ n (- m))
+)(define (zero  [x : Integer]) : (Vector)
+    (if (eq? x 0)
+       (vector)
+       (zero (minus (vector-ref (vector x) 0) 1))
+    )
+ )(define (one  [x : Integer]) : (Vector (Vector) Integer)
+     (if (eq? x 0)
+        (vector (zero 20) 42)
+        (one (minus (vector-ref (vector x) 0) 1))
+     )
+  )(define (two  [x : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      (if (eq? x 0)
+         (vector (zero 20) 42 (one 20))
+         (two (minus (vector-ref (vector x) 0) 1))
+      )
+   )(define (three  [x : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       (if (eq? x 0)
+          (vector (zero 20) 42 (one 20) (two 20))
+          (three (minus (vector-ref (vector x) 0) 1))
+       )
+    )(define (main ) : Integer
+        (vector-ref (vector-ref (vector-ref (vector-ref (vector (zero 20) 42 (one 20) (two 20) (three 20)) 4) 3) 2) 1)
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: uniquify @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394  [n4399 : Integer] [m4400 : Integer]) : Integer
+   (+ n4399 (- m4400))
+)(define (zero4395  [x4401 : Integer]) : (Vector)
+    (if (eq? x4401 0)
+       (vector)
+       (zero4395 (minus4394 (vector-ref (vector x4401) 0) 1))
+    )
+ )(define (one4396  [x4402 : Integer]) : (Vector (Vector) Integer)
+     (if (eq? x4402 0)
+        (vector (zero4395 20) 42)
+        (one4396 (minus4394 (vector-ref (vector x4402) 0) 1))
+     )
+  )(define (two4397  [x4403 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      (if (eq? x4403 0)
+         (vector (zero4395 20) 42 (one4396 20))
+         (two4397 (minus4394 (vector-ref (vector x4403) 0) 1))
+      )
+   )(define (three4398  [x4404 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       (if (eq? x4404 0)
+          (vector (zero4395 20) 42 (one4396 20) (two4397 20))
+          (three4398 (minus4394 (vector-ref (vector x4404) 0) 1))
+       )
+    )(define (main ) : Integer
+        (vector-ref (vector-ref (vector-ref (vector-ref (vector (zero4395 20) 42 (one4396 20) (two4397 20) (three4398 20)) 4) 3) 2) 1)
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: reveal functions @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394  [n4399 : Integer] [m4400 : Integer]) : Integer
+   (+ n4399 (- m4400))
+)(define (zero4395  [x4401 : Integer]) : (Vector)
+    (if (eq? x4401 0)
+       (vector)
+       ('zero4395 ('minus4394 (vector-ref (vector x4401) 0) 1))
+    )
+ )(define (one4396  [x4402 : Integer]) : (Vector (Vector) Integer)
+     (if (eq? x4402 0)
+        (vector ('zero4395 20) 42)
+        ('one4396 ('minus4394 (vector-ref (vector x4402) 0) 1))
+     )
+  )(define (two4397  [x4403 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      (if (eq? x4403 0)
+         (vector ('zero4395 20) 42 ('one4396 20))
+         ('two4397 ('minus4394 (vector-ref (vector x4403) 0) 1))
+      )
+   )(define (three4398  [x4404 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       (if (eq? x4404 0)
+          (vector ('zero4395 20) 42 ('one4396 20) ('two4397 20))
+          ('three4398 ('minus4394 (vector-ref (vector x4404) 0) 1))
+       )
+    )(define (main ) : Integer
+        (vector-ref (vector-ref (vector-ref (vector-ref (vector ('zero4395 20) 42 ('one4396 20) ('two4397 20) ('three4398 20)) 4) 3) 2) 1)
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: limit functions @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394  [n4399 : Integer] [m4400 : Integer]) : Integer
+   (+ n4399 (- m4400))
+)(define (zero4395  [x4401 : Integer]) : (Vector)
+    (if (eq? x4401 0)
+       (vector)
+       ('zero4395 ('minus4394 (vector-ref (vector x4401) 0) 1))
+    )
+ )(define (one4396  [x4402 : Integer]) : (Vector (Vector) Integer)
+     (if (eq? x4402 0)
+        (vector ('zero4395 20) 42)
+        ('one4396 ('minus4394 (vector-ref (vector x4402) 0) 1))
+     )
+  )(define (two4397  [x4403 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      (if (eq? x4403 0)
+         (vector ('zero4395 20) 42 ('one4396 20))
+         ('two4397 ('minus4394 (vector-ref (vector x4403) 0) 1))
+      )
+   )(define (three4398  [x4404 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       (if (eq? x4404 0)
+          (vector ('zero4395 20) 42 ('one4396 20) ('two4397 20))
+          ('three4398 ('minus4394 (vector-ref (vector x4404) 0) 1))
+       )
+    )(define (main ) : Integer
+        (vector-ref (vector-ref (vector-ref (vector-ref (vector ('zero4395 20) 42 ('one4396 20) ('two4397 20) ('three4398 20)) 4) 3) 2) 1)
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: expose allocation @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394  [n4399 : Integer] [m4400 : Integer]) : Integer
+   (+ n4399 (- m4400))
+)(define (zero4395  [x4401 : Integer]) : (Vector)
+    (if (eq? x4401 0)
+       (let ([_ (if (< (+ (global-value free_ptr) 8) (global-value fromspace_end))
+                   (void)
+                   (collect 8)
+                )])
+          (let ([v (allocate 0 (Vector))])
+             v)
+          )
+       
+       ('zero4395 ('minus4394 (vector-ref (let ([x0 x4401])
+                                             (let ([_ (if (< (+ (global-value free_ptr) 16) (global-value fromspace_end))
+                                                         (void)
+                                                         (collect 16)
+                                                      )])
+                                                (let ([v (allocate 1 (Vector Integer))])
+                                                   (let ([_ (vector-set! v 0 x0)])
+                                                      v)
+                                                   )
+                                                )
+                                             )
+                                           0) 1))
+    )
+ )(define (one4396  [x4402 : Integer]) : (Vector (Vector) Integer)
+     (if (eq? x4402 0)
+        (let ([x1 42])
+           (let ([x0 ('zero4395 20)])
+              (let ([_ (if (< (+ (global-value free_ptr) 24) (global-value fromspace_end))
+                          (void)
+                          (collect 24)
+                       )])
+                 (let ([v (allocate 2 (Vector (Vector) Integer))])
+                    (let ([_ (vector-set! v 1 x1)])
+                       (let ([_ (vector-set! v 0 x0)])
+                          v)
+                       )
+                    )
+                 )
+              )
+           )
+        
+        ('one4396 ('minus4394 (vector-ref (let ([x0 x4402])
+                                             (let ([_ (if (< (+ (global-value free_ptr) 16) (global-value fromspace_end))
+                                                         (void)
+                                                         (collect 16)
+                                                      )])
+                                                (let ([v (allocate 1 (Vector Integer))])
+                                                   (let ([_ (vector-set! v 0 x0)])
+                                                      v)
+                                                   )
+                                                )
+                                             )
+                                           0) 1))
+     )
+  )(define (two4397  [x4403 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      (if (eq? x4403 0)
+         (let ([x2 ('one4396 20)])
+            (let ([x1 42])
+               (let ([x0 ('zero4395 20)])
+                  (let ([_ (if (< (+ (global-value free_ptr) 32) (global-value fromspace_end))
+                              (void)
+                              (collect 32)
+                           )])
+                     (let ([v (allocate 3 (Vector (Vector) Integer (Vector (Vector) Integer)))])
+                        (let ([_ (vector-set! v 2 x2)])
+                           (let ([_ (vector-set! v 1 x1)])
+                              (let ([_ (vector-set! v 0 x0)])
+                                 v)
+                              )
+                           )
+                        )
+                     )
+                  )
+               )
+            )
+         
+         ('two4397 ('minus4394 (vector-ref (let ([x0 x4403])
+                                              (let ([_ (if (< (+ (global-value free_ptr) 16) (global-value fromspace_end))
+                                                          (void)
+                                                          (collect 16)
+                                                       )])
+                                                 (let ([v (allocate 1 (Vector Integer))])
+                                                    (let ([_ (vector-set! v 0 x0)])
+                                                       v)
+                                                    )
+                                                 )
+                                              )
+                                            0) 1))
+      )
+   )(define (three4398  [x4404 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       (if (eq? x4404 0)
+          (let ([x3 ('two4397 20)])
+             (let ([x2 ('one4396 20)])
+                (let ([x1 42])
+                   (let ([x0 ('zero4395 20)])
+                      (let ([_ (if (< (+ (global-value free_ptr) 40) (global-value fromspace_end))
+                                  (void)
+                                  (collect 40)
+                               )])
+                         (let ([v (allocate 4 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer))))])
+                            (let ([_ (vector-set! v 3 x3)])
+                               (let ([_ (vector-set! v 2 x2)])
+                                  (let ([_ (vector-set! v 1 x1)])
+                                     (let ([_ (vector-set! v 0 x0)])
+                                        v)
+                                     )
+                                  )
+                               )
+                            )
+                         )
+                      )
+                   )
+                )
+             )
+          
+          ('three4398 ('minus4394 (vector-ref (let ([x0 x4404])
+                                                 (let ([_ (if (< (+ (global-value free_ptr) 16) (global-value fromspace_end))
+                                                             (void)
+                                                             (collect 16)
+                                                          )])
+                                                    (let ([v (allocate 1 (Vector Integer))])
+                                                       (let ([_ (vector-set! v 0 x0)])
+                                                          v)
+                                                       )
+                                                    )
+                                                 )
+                                               0) 1))
+       )
+    )(define (main ) : Integer
+        (vector-ref (vector-ref (vector-ref (vector-ref (let ([x4 ('three4398 20)])
+                                                           (let ([x3 ('two4397 20)])
+                                                              (let ([x2 ('one4396 20)])
+                                                                 (let ([x1 42])
+                                                                    (let ([x0 ('zero4395 20)])
+                                                                       (let ([_ (if (< (+ (global-value free_ptr) 48) (global-value fromspace_end))
+                                                                                   (void)
+                                                                                   (collect 48)
+                                                                                )])
+                                                                          (let ([v (allocate 5 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)) (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))))])
+                                                                             (let ([_ (vector-set! v 4 x4)])
+                                                                                (let ([_ (vector-set! v 3 x3)])
+                                                                                   (let ([_ (vector-set! v 2 x2)])
+                                                                                      (let ([_ (vector-set! v 1 x1)])
+                                                                                         (let ([_ (vector-set! v 0 x0)])
+                                                                                            v)
+                                                                                         )
+                                                                                      )
+                                                                                   )
+                                                                                )
+                                                                             )
+                                                                          )
+                                                                       )
+                                                                    )
+                                                                 )
+                                                              )
+                                                           )
+                                                         4) 3) 2) 1)
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: remove complex opera* @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394  [n4399 : Integer] [m4400 : Integer]) : Integer
+   (let ([tmp4408 (- m4400)])
+      (+ n4399 tmp4408))
+   
+)(define (zero4395  [x4401 : Integer]) : (Vector)
+    (if (eq? x4401 0)
+       (let ([_ (if (let ([tmp4409 (global-value free_ptr)])
+                       (let ([tmp4410 (+ tmp4409 8)])
+                          (let ([tmp4411 (global-value fromspace_end)])
+                             (< tmp4410 tmp4411))
+                          )
+                       )
+                    
+                   (void)
+                   (collect 8)
+                )])
+          (let ([v (allocate 0 (Vector))])
+             v)
+          )
+       
+       (let ([tmp4416 'minus4394])
+          (let ([x0 x4401])
+             (let ([_ (if (let ([tmp4412 (global-value free_ptr)])
+                             (let ([tmp4413 (+ tmp4412 16)])
+                                (let ([tmp4414 (global-value fromspace_end)])
+                                   (< tmp4413 tmp4414))
+                                )
+                             )
+                          
+                         (void)
+                         (collect 16)
+                      )])
+                (let ([v (allocate 1 (Vector Integer))])
+                   (let ([_ (vector-set! v 0 x0)])
+                      (let ([tmp4415 (vector-ref v 0)])
+                         (let ([tmp4417 (tmp4416 tmp4415 1)])
+                            (let ([tmp4418 'zero4395])
+                               (tmp4418 tmp4417))
+                            )
+                         )
+                      )
+                   )
+                )
+             )
+          )
+       
+    )
+ )(define (one4396  [x4402 : Integer]) : (Vector (Vector) Integer)
+     (if (eq? x4402 0)
+        (let ([x1 42])
+           (let ([x0 (let ([tmp4419 'zero4395])
+                        (tmp4419 20))
+                     ])
+              (let ([_ (if (let ([tmp4420 (global-value free_ptr)])
+                              (let ([tmp4421 (+ tmp4420 24)])
+                                 (let ([tmp4422 (global-value fromspace_end)])
+                                    (< tmp4421 tmp4422))
+                                 )
+                              )
+                           
+                          (void)
+                          (collect 24)
+                       )])
+                 (let ([v (allocate 2 (Vector (Vector) Integer))])
+                    (let ([_ (vector-set! v 1 x1)])
+                       (let ([_ (vector-set! v 0 x0)])
+                          v)
+                       )
+                    )
+                 )
+              )
+           )
+        
+        (let ([tmp4427 'minus4394])
+           (let ([x0 x4402])
+              (let ([_ (if (let ([tmp4423 (global-value free_ptr)])
+                              (let ([tmp4424 (+ tmp4423 16)])
+                                 (let ([tmp4425 (global-value fromspace_end)])
+                                    (< tmp4424 tmp4425))
+                                 )
+                              )
+                           
+                          (void)
+                          (collect 16)
+                       )])
+                 (let ([v (allocate 1 (Vector Integer))])
+                    (let ([_ (vector-set! v 0 x0)])
+                       (let ([tmp4426 (vector-ref v 0)])
+                          (let ([tmp4428 (tmp4427 tmp4426 1)])
+                             (let ([tmp4429 'one4396])
+                                (tmp4429 tmp4428))
+                             )
+                          )
+                       )
+                    )
+                 )
+              )
+           )
+        
+     )
+  )(define (two4397  [x4403 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      (if (eq? x4403 0)
+         (let ([x2 (let ([tmp4430 'one4396])
+                      (tmp4430 20))
+                   ])
+            (let ([x1 42])
+               (let ([x0 (let ([tmp4431 'zero4395])
+                            (tmp4431 20))
+                         ])
+                  (let ([_ (if (let ([tmp4432 (global-value free_ptr)])
+                                  (let ([tmp4433 (+ tmp4432 32)])
+                                     (let ([tmp4434 (global-value fromspace_end)])
+                                        (< tmp4433 tmp4434))
+                                     )
+                                  )
+                               
+                              (void)
+                              (collect 32)
+                           )])
+                     (let ([v (allocate 3 (Vector (Vector) Integer (Vector (Vector) Integer)))])
+                        (let ([_ (vector-set! v 2 x2)])
+                           (let ([_ (vector-set! v 1 x1)])
+                              (let ([_ (vector-set! v 0 x0)])
+                                 v)
+                              )
+                           )
+                        )
+                     )
+                  )
+               )
+            )
+         
+         (let ([tmp4439 'minus4394])
+            (let ([x0 x4403])
+               (let ([_ (if (let ([tmp4435 (global-value free_ptr)])
+                               (let ([tmp4436 (+ tmp4435 16)])
+                                  (let ([tmp4437 (global-value fromspace_end)])
+                                     (< tmp4436 tmp4437))
+                                  )
+                               )
+                            
+                           (void)
+                           (collect 16)
+                        )])
+                  (let ([v (allocate 1 (Vector Integer))])
+                     (let ([_ (vector-set! v 0 x0)])
+                        (let ([tmp4438 (vector-ref v 0)])
+                           (let ([tmp4440 (tmp4439 tmp4438 1)])
+                              (let ([tmp4441 'two4397])
+                                 (tmp4441 tmp4440))
+                              )
+                           )
+                        )
+                     )
+                  )
+               )
+            )
+         
+      )
+   )(define (three4398  [x4404 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       (if (eq? x4404 0)
+          (let ([x3 (let ([tmp4442 'two4397])
+                       (tmp4442 20))
+                    ])
+             (let ([x2 (let ([tmp4443 'one4396])
+                          (tmp4443 20))
+                       ])
+                (let ([x1 42])
+                   (let ([x0 (let ([tmp4444 'zero4395])
+                                (tmp4444 20))
+                             ])
+                      (let ([_ (if (let ([tmp4445 (global-value free_ptr)])
+                                      (let ([tmp4446 (+ tmp4445 40)])
+                                         (let ([tmp4447 (global-value fromspace_end)])
+                                            (< tmp4446 tmp4447))
+                                         )
+                                      )
+                                   
+                                  (void)
+                                  (collect 40)
+                               )])
+                         (let ([v (allocate 4 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer))))])
+                            (let ([_ (vector-set! v 3 x3)])
+                               (let ([_ (vector-set! v 2 x2)])
+                                  (let ([_ (vector-set! v 1 x1)])
+                                     (let ([_ (vector-set! v 0 x0)])
+                                        v)
+                                     )
+                                  )
+                               )
+                            )
+                         )
+                      )
+                   )
+                )
+             )
+          
+          (let ([tmp4452 'minus4394])
+             (let ([x0 x4404])
+                (let ([_ (if (let ([tmp4448 (global-value free_ptr)])
+                                (let ([tmp4449 (+ tmp4448 16)])
+                                   (let ([tmp4450 (global-value fromspace_end)])
+                                      (< tmp4449 tmp4450))
+                                   )
+                                )
+                             
+                            (void)
+                            (collect 16)
+                         )])
+                   (let ([v (allocate 1 (Vector Integer))])
+                      (let ([_ (vector-set! v 0 x0)])
+                         (let ([tmp4451 (vector-ref v 0)])
+                            (let ([tmp4453 (tmp4452 tmp4451 1)])
+                               (let ([tmp4454 'three4398])
+                                  (tmp4454 tmp4453))
+                               )
+                            )
+                         )
+                      )
+                   )
+                )
+             )
+          
+       )
+    )(define (main ) : Integer
+        (let ([x4 (let ([tmp4455 'three4398])
+                     (tmp4455 20))
+                  ])
+           (let ([x3 (let ([tmp4456 'two4397])
+                        (tmp4456 20))
+                     ])
+              (let ([x2 (let ([tmp4457 'one4396])
+                           (tmp4457 20))
+                        ])
+                 (let ([x1 42])
+                    (let ([x0 (let ([tmp4458 'zero4395])
+                                 (tmp4458 20))
+                              ])
+                       (let ([_ (if (let ([tmp4459 (global-value free_ptr)])
+                                       (let ([tmp4460 (+ tmp4459 48)])
+                                          (let ([tmp4461 (global-value fromspace_end)])
+                                             (< tmp4460 tmp4461))
+                                          )
+                                       )
+                                    
+                                   (void)
+                                   (collect 48)
+                                )])
+                          (let ([v (allocate 5 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)) (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))))])
+                             (let ([_ (vector-set! v 4 x4)])
+                                (let ([_ (vector-set! v 3 x3)])
+                                   (let ([_ (vector-set! v 2 x2)])
+                                      (let ([_ (vector-set! v 1 x1)])
+                                         (let ([_ (vector-set! v 0 x0)])
+                                            (let ([tmp4462 (vector-ref v 4)])
+                                               (let ([tmp4463 (vector-ref tmp4462 3)])
+                                                  (let ([tmp4464 (vector-ref tmp4463 2)])
+                                                     (vector-ref tmp4464 1))
+                                                  )
+                                               )
+                                            )
+                                         )
+                                      )
+                                   )
+                                )
+                             )
+                          )
+                       )
+                    )
+                 )
+              )
+           )
+        
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: explicate control @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394  [n4399 : Integer] [m4400 : Integer]) : Integer
+   minus4394start:
+      tmp4408 = (- m4400);
+      return (+ n4399 tmp4408);
+   
+)(define (zero4395  [x4401 : Integer]) : (Vector)
+    block4467:
+       _ = (void);
+       goto block4466;
+    block4468:
+       (collect 8)
+       goto block4466;
+    block4471:
+       _ = (void);
+       goto block4470;
+    block4472:
+       (collect 16)
+       goto block4470;
+    block4474:
+       tmp4409 = (global-value free_ptr);
+       tmp4410 = (+ tmp4409 8);
+       tmp4411 = (global-value fromspace_end);
+       tmp4469 = (< tmp4410 tmp4411);
+       if (eq? tmp4469 #t)
+          goto block4467;
+       else
+          goto block4468;
+    block4475:
+       tmp4416 = 'minus4394;
+       x0 = x4401;
+       tmp4412 = (global-value free_ptr);
+       tmp4413 = (+ tmp4412 16);
+       tmp4414 = (global-value fromspace_end);
+       tmp4473 = (< tmp4413 tmp4414);
+       if (eq? tmp4473 #t)
+          goto block4471;
+       else
+          goto block4472;
+    zero4395start:
+       if (eq? x4401 0)
+          goto block4474;
+       else
+          goto block4475;
+    block4470:
+       v = (allocate 1 (Vector Integer));
+       _ = (vector-set! v 0 x0);
+       tmp4415 = (vector-ref v 0);
+       tmp4417 = (tmp4416 tmp4415 1);
+       tmp4418 = 'zero4395;
+       (tmp4418 tmp4417)
+    block4466:
+       v = (allocate 0 (Vector));
+       return v;
+    
+ )(define (one4396  [x4402 : Integer]) : (Vector (Vector) Integer)
+     one4396start:
+        if (eq? x4402 0)
+           goto block4484;
+        else
+           goto block4485;
+     block4477:
+        _ = (void);
+        goto block4476;
+     block4476:
+        v = (allocate 2 (Vector (Vector) Integer));
+        _ = (vector-set! v 1 x1);
+        _ = (vector-set! v 0 x0);
+        return v;
+     block4478:
+        (collect 24)
+        goto block4476;
+     block4480:
+        v = (allocate 1 (Vector Integer));
+        _ = (vector-set! v 0 x0);
+        tmp4426 = (vector-ref v 0);
+        tmp4428 = (tmp4427 tmp4426 1);
+        tmp4429 = 'one4396;
+        (tmp4429 tmp4428)
+     block4481:
+        _ = (void);
+        goto block4480;
+     block4482:
+        (collect 16)
+        goto block4480;
+     block4484:
+        x1 = 42;
+        tmp4419 = 'zero4395;
+        x0 = (tmp4419 20);
+        tmp4420 = (global-value free_ptr);
+        tmp4421 = (+ tmp4420 24);
+        tmp4422 = (global-value fromspace_end);
+        tmp4479 = (< tmp4421 tmp4422);
+        if (eq? tmp4479 #t)
+           goto block4477;
+        else
+           goto block4478;
+     block4485:
+        tmp4427 = 'minus4394;
+        x0 = x4402;
+        tmp4423 = (global-value free_ptr);
+        tmp4424 = (+ tmp4423 16);
+        tmp4425 = (global-value fromspace_end);
+        tmp4483 = (< tmp4424 tmp4425);
+        if (eq? tmp4483 #t)
+           goto block4481;
+        else
+           goto block4482;
+     
+  )(define (two4397  [x4403 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      block4486:
+         v = (allocate 3 (Vector (Vector) Integer (Vector (Vector) Integer)));
+         _ = (vector-set! v 2 x2);
+         _ = (vector-set! v 1 x1);
+         _ = (vector-set! v 0 x0);
+         return v;
+      block4487:
+         _ = (void);
+         goto block4486;
+      block4488:
+         (collect 32)
+         goto block4486;
+      block4490:
+         v = (allocate 1 (Vector Integer));
+         _ = (vector-set! v 0 x0);
+         tmp4438 = (vector-ref v 0);
+         tmp4440 = (tmp4439 tmp4438 1);
+         tmp4441 = 'two4397;
+         (tmp4441 tmp4440)
+      block4491:
+         _ = (void);
+         goto block4490;
+      block4492:
+         (collect 16)
+         goto block4490;
+      block4494:
+         tmp4430 = 'one4396;
+         x2 = (tmp4430 20);
+         x1 = 42;
+         tmp4431 = 'zero4395;
+         x0 = (tmp4431 20);
+         tmp4432 = (global-value free_ptr);
+         tmp4433 = (+ tmp4432 32);
+         tmp4434 = (global-value fromspace_end);
+         tmp4489 = (< tmp4433 tmp4434);
+         if (eq? tmp4489 #t)
+            goto block4487;
+         else
+            goto block4488;
+      block4495:
+         tmp4439 = 'minus4394;
+         x0 = x4403;
+         tmp4435 = (global-value free_ptr);
+         tmp4436 = (+ tmp4435 16);
+         tmp4437 = (global-value fromspace_end);
+         tmp4493 = (< tmp4436 tmp4437);
+         if (eq? tmp4493 #t)
+            goto block4491;
+         else
+            goto block4492;
+      two4397start:
+         if (eq? x4403 0)
+            goto block4494;
+         else
+            goto block4495;
+      
+   )(define (three4398  [x4404 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       block4501:
+          _ = (void);
+          goto block4500;
+       three4398start:
+          if (eq? x4404 0)
+             goto block4504;
+          else
+             goto block4505;
+       block4496:
+          v = (allocate 4 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer))));
+          _ = (vector-set! v 3 x3);
+          _ = (vector-set! v 2 x2);
+          _ = (vector-set! v 1 x1);
+          _ = (vector-set! v 0 x0);
+          return v;
+       block4497:
+          _ = (void);
+          goto block4496;
+       block4498:
+          (collect 40)
+          goto block4496;
+       block4500:
+          v = (allocate 1 (Vector Integer));
+          _ = (vector-set! v 0 x0);
+          tmp4451 = (vector-ref v 0);
+          tmp4453 = (tmp4452 tmp4451 1);
+          tmp4454 = 'three4398;
+          (tmp4454 tmp4453)
+       block4502:
+          (collect 16)
+          goto block4500;
+       block4504:
+          tmp4442 = 'two4397;
+          x3 = (tmp4442 20);
+          tmp4443 = 'one4396;
+          x2 = (tmp4443 20);
+          x1 = 42;
+          tmp4444 = 'zero4395;
+          x0 = (tmp4444 20);
+          tmp4445 = (global-value free_ptr);
+          tmp4446 = (+ tmp4445 40);
+          tmp4447 = (global-value fromspace_end);
+          tmp4499 = (< tmp4446 tmp4447);
+          if (eq? tmp4499 #t)
+             goto block4497;
+          else
+             goto block4498;
+       block4505:
+          tmp4452 = 'minus4394;
+          x0 = x4404;
+          tmp4448 = (global-value free_ptr);
+          tmp4449 = (+ tmp4448 16);
+          tmp4450 = (global-value fromspace_end);
+          tmp4503 = (< tmp4449 tmp4450);
+          if (eq? tmp4503 #t)
+             goto block4501;
+          else
+             goto block4502;
+       
+    )(define (main ) : Integer
+        mainstart:
+           tmp4455 = 'three4398;
+           x4 = (tmp4455 20);
+           tmp4456 = 'two4397;
+           x3 = (tmp4456 20);
+           tmp4457 = 'one4396;
+           x2 = (tmp4457 20);
+           x1 = 42;
+           tmp4458 = 'zero4395;
+           x0 = (tmp4458 20);
+           tmp4459 = (global-value free_ptr);
+           tmp4460 = (+ tmp4459 48);
+           tmp4461 = (global-value fromspace_end);
+           tmp4509 = (< tmp4460 tmp4461);
+           if (eq? tmp4509 #t)
+              goto block4507;
+           else
+              goto block4508;
+        block4506:
+           v = (allocate 5 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)) (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))));
+           _ = (vector-set! v 4 x4);
+           _ = (vector-set! v 3 x3);
+           _ = (vector-set! v 2 x2);
+           _ = (vector-set! v 1 x1);
+           _ = (vector-set! v 0 x0);
+           tmp4462 = (vector-ref v 4);
+           tmp4463 = (vector-ref tmp4462 3);
+           tmp4464 = (vector-ref tmp4463 2);
+           return (vector-ref tmp4464 1);
+        block4507:
+           _ = (void);
+           goto block4506;
+        block4508:
+           (collect 48)
+           goto block4506;
+        
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: uncover locals @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394  [n4399 : Integer] [m4400 : Integer]) : Integer
+   minus4394start:
+      tmp4408 = (- m4400);
+      return (+ n4399 tmp4408);
+   
+)(define (zero4395  [x4401 : Integer]) : (Vector)
+    block4467:
+       _ = (void);
+       goto block4466;
+    block4468:
+       (collect 8)
+       goto block4466;
+    block4471:
+       _ = (void);
+       goto block4470;
+    block4472:
+       (collect 16)
+       goto block4470;
+    block4474:
+       tmp4409 = (global-value free_ptr);
+       tmp4410 = (+ tmp4409 8);
+       tmp4411 = (global-value fromspace_end);
+       tmp4469 = (< tmp4410 tmp4411);
+       if (eq? tmp4469 #t)
+          goto block4467;
+       else
+          goto block4468;
+    block4475:
+       tmp4416 = 'minus4394;
+       x0 = x4401;
+       tmp4412 = (global-value free_ptr);
+       tmp4413 = (+ tmp4412 16);
+       tmp4414 = (global-value fromspace_end);
+       tmp4473 = (< tmp4413 tmp4414);
+       if (eq? tmp4473 #t)
+          goto block4471;
+       else
+          goto block4472;
+    zero4395start:
+       if (eq? x4401 0)
+          goto block4474;
+       else
+          goto block4475;
+    block4470:
+       v = (allocate 1 (Vector Integer));
+       _ = (vector-set! v 0 x0);
+       tmp4415 = (vector-ref v 0);
+       tmp4417 = (tmp4416 tmp4415 1);
+       tmp4418 = 'zero4395;
+       (tmp4418 tmp4417)
+    block4466:
+       v = (allocate 0 (Vector));
+       return v;
+    
+ )(define (one4396  [x4402 : Integer]) : (Vector (Vector) Integer)
+     one4396start:
+        if (eq? x4402 0)
+           goto block4484;
+        else
+           goto block4485;
+     block4477:
+        _ = (void);
+        goto block4476;
+     block4476:
+        v = (allocate 2 (Vector (Vector) Integer));
+        _ = (vector-set! v 1 x1);
+        _ = (vector-set! v 0 x0);
+        return v;
+     block4478:
+        (collect 24)
+        goto block4476;
+     block4480:
+        v = (allocate 1 (Vector Integer));
+        _ = (vector-set! v 0 x0);
+        tmp4426 = (vector-ref v 0);
+        tmp4428 = (tmp4427 tmp4426 1);
+        tmp4429 = 'one4396;
+        (tmp4429 tmp4428)
+     block4481:
+        _ = (void);
+        goto block4480;
+     block4482:
+        (collect 16)
+        goto block4480;
+     block4484:
+        x1 = 42;
+        tmp4419 = 'zero4395;
+        x0 = (tmp4419 20);
+        tmp4420 = (global-value free_ptr);
+        tmp4421 = (+ tmp4420 24);
+        tmp4422 = (global-value fromspace_end);
+        tmp4479 = (< tmp4421 tmp4422);
+        if (eq? tmp4479 #t)
+           goto block4477;
+        else
+           goto block4478;
+     block4485:
+        tmp4427 = 'minus4394;
+        x0 = x4402;
+        tmp4423 = (global-value free_ptr);
+        tmp4424 = (+ tmp4423 16);
+        tmp4425 = (global-value fromspace_end);
+        tmp4483 = (< tmp4424 tmp4425);
+        if (eq? tmp4483 #t)
+           goto block4481;
+        else
+           goto block4482;
+     
+  )(define (two4397  [x4403 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      block4486:
+         v = (allocate 3 (Vector (Vector) Integer (Vector (Vector) Integer)));
+         _ = (vector-set! v 2 x2);
+         _ = (vector-set! v 1 x1);
+         _ = (vector-set! v 0 x0);
+         return v;
+      block4487:
+         _ = (void);
+         goto block4486;
+      block4488:
+         (collect 32)
+         goto block4486;
+      block4490:
+         v = (allocate 1 (Vector Integer));
+         _ = (vector-set! v 0 x0);
+         tmp4438 = (vector-ref v 0);
+         tmp4440 = (tmp4439 tmp4438 1);
+         tmp4441 = 'two4397;
+         (tmp4441 tmp4440)
+      block4491:
+         _ = (void);
+         goto block4490;
+      block4492:
+         (collect 16)
+         goto block4490;
+      block4494:
+         tmp4430 = 'one4396;
+         x2 = (tmp4430 20);
+         x1 = 42;
+         tmp4431 = 'zero4395;
+         x0 = (tmp4431 20);
+         tmp4432 = (global-value free_ptr);
+         tmp4433 = (+ tmp4432 32);
+         tmp4434 = (global-value fromspace_end);
+         tmp4489 = (< tmp4433 tmp4434);
+         if (eq? tmp4489 #t)
+            goto block4487;
+         else
+            goto block4488;
+      block4495:
+         tmp4439 = 'minus4394;
+         x0 = x4403;
+         tmp4435 = (global-value free_ptr);
+         tmp4436 = (+ tmp4435 16);
+         tmp4437 = (global-value fromspace_end);
+         tmp4493 = (< tmp4436 tmp4437);
+         if (eq? tmp4493 #t)
+            goto block4491;
+         else
+            goto block4492;
+      two4397start:
+         if (eq? x4403 0)
+            goto block4494;
+         else
+            goto block4495;
+      
+   )(define (three4398  [x4404 : Integer]) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       block4501:
+          _ = (void);
+          goto block4500;
+       three4398start:
+          if (eq? x4404 0)
+             goto block4504;
+          else
+             goto block4505;
+       block4496:
+          v = (allocate 4 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer))));
+          _ = (vector-set! v 3 x3);
+          _ = (vector-set! v 2 x2);
+          _ = (vector-set! v 1 x1);
+          _ = (vector-set! v 0 x0);
+          return v;
+       block4497:
+          _ = (void);
+          goto block4496;
+       block4498:
+          (collect 40)
+          goto block4496;
+       block4500:
+          v = (allocate 1 (Vector Integer));
+          _ = (vector-set! v 0 x0);
+          tmp4451 = (vector-ref v 0);
+          tmp4453 = (tmp4452 tmp4451 1);
+          tmp4454 = 'three4398;
+          (tmp4454 tmp4453)
+       block4502:
+          (collect 16)
+          goto block4500;
+       block4504:
+          tmp4442 = 'two4397;
+          x3 = (tmp4442 20);
+          tmp4443 = 'one4396;
+          x2 = (tmp4443 20);
+          x1 = 42;
+          tmp4444 = 'zero4395;
+          x0 = (tmp4444 20);
+          tmp4445 = (global-value free_ptr);
+          tmp4446 = (+ tmp4445 40);
+          tmp4447 = (global-value fromspace_end);
+          tmp4499 = (< tmp4446 tmp4447);
+          if (eq? tmp4499 #t)
+             goto block4497;
+          else
+             goto block4498;
+       block4505:
+          tmp4452 = 'minus4394;
+          x0 = x4404;
+          tmp4448 = (global-value free_ptr);
+          tmp4449 = (+ tmp4448 16);
+          tmp4450 = (global-value fromspace_end);
+          tmp4503 = (< tmp4449 tmp4450);
+          if (eq? tmp4503 #t)
+             goto block4501;
+          else
+             goto block4502;
+       
+    )(define (main ) : Integer
+        mainstart:
+           tmp4455 = 'three4398;
+           x4 = (tmp4455 20);
+           tmp4456 = 'two4397;
+           x3 = (tmp4456 20);
+           tmp4457 = 'one4396;
+           x2 = (tmp4457 20);
+           x1 = 42;
+           tmp4458 = 'zero4395;
+           x0 = (tmp4458 20);
+           tmp4459 = (global-value free_ptr);
+           tmp4460 = (+ tmp4459 48);
+           tmp4461 = (global-value fromspace_end);
+           tmp4509 = (< tmp4460 tmp4461);
+           if (eq? tmp4509 #t)
+              goto block4507;
+           else
+              goto block4508;
+        block4506:
+           v = (allocate 5 (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)) (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))));
+           _ = (vector-set! v 4 x4);
+           _ = (vector-set! v 3 x3);
+           _ = (vector-set! v 2 x2);
+           _ = (vector-set! v 1 x1);
+           _ = (vector-set! v 0 x0);
+           tmp4462 = (vector-ref v 4);
+           tmp4463 = (vector-ref tmp4462 3);
+           tmp4464 = (vector-ref tmp4463 2);
+           return (vector-ref tmp4464 1);
+        block4507:
+           _ = (void);
+           goto block4506;
+        block4508:
+           (collect 48)
+           goto block4506;
+        
+     )
+
+
+
+running output  @ utilities.rkt:1503
+new-result:
+42
+
+
+testing @ utilities.rkt:1489
+test-name:
+"r4_14"
+
+
+running pass: instruction selection @ utilities.rkt:1493
+
+pass output:  @ utilities.rkt:1496
+(strip-has-type new-p):
+functions:
+(define (minus4394 ) : Integer
+   minus4394start:
+      movq %rdi, n4399
+      movq %rsi, m4400
+      movq m4400, tmp4408
+      negq tmp4408
+      movq n4399, %rax
+      addq tmp4408, %rax
+      jmp minus4394conclusion
+      
+   
+)(define (zero4395 ) : (Vector)
+    block4467:
+       movq $0, _
+       jmp block4466
+       
+    block4468:
+       movq %r15, %rdi
+       movq $8, %rsi
+       callq collect
+       jmp block4466
+       
+    block4471:
+       movq $0, _
+       jmp block4470
+       
+    block4472:
+       movq %r15, %rdi
+       movq $16, %rsi
+       callq collect
+       jmp block4470
+       
+    block4474:
+       movq free_ptr(%rip), tmp4409
+       movq tmp4409, tmp4410
+       addq $8, tmp4410
+       movq fromspace_end(%rip), tmp4411
+       cmpq tmp4411, tmp4410
+       setl %al
+       movzbq %al, tmp4469
+       cmpq $1, tmp4469
+       je block4467
+       jmp block4468
+       
+    block4475:
+       leaq 'minus4394, tmp4416
+       movq x4401, x0
+       movq free_ptr(%rip), tmp4412
+       movq tmp4412, tmp4413
+       addq $16, tmp4413
+       movq fromspace_end(%rip), tmp4414
+       cmpq tmp4414, tmp4413
+       setl %al
+       movzbq %al, tmp4473
+       cmpq $1, tmp4473
+       je block4471
+       jmp block4472
+       
+    zero4395start:
+       movq %rdi, x4401
+       cmpq $0, x4401
+       je block4474
+       jmp block4475
+       
+    block4470:
+       movq free_ptr(%rip), v
+       addq $16, free_ptr(%rip)
+       movq v, %r11
+       movq $3, 0(%r11)
+       movq v, %r11
+       movq x0, 8(%r11)
+       movq $0, _
+       movq v, %r11
+       movq 8(%r11), tmp4415
+       movq tmp4415, %rdi
+       movq $1, %rsi
+       callq *tmp4416
+       movq %rax, tmp4417
+       leaq 'zero4395, tmp4418
+       movq tmp4417, %rdi
+       tailjmp tmp4418
+       
+    block4466:
+       movq free_ptr(%rip), v
+       addq $8, free_ptr(%rip)
+       movq v, %r11
+       movq $1, 0(%r11)
+       movq v, %rax
+       jmp zero4395conclusion
+       
+    
+ )(define (one4396 ) : (Vector (Vector) Integer)
+     one4396start:
+        movq %rdi, x4402
+        cmpq $0, x4402
+        je block4484
+        jmp block4485
+        
+     block4477:
+        movq $0, _
+        jmp block4476
+        
+     block4476:
+        movq free_ptr(%rip), v
+        addq $24, free_ptr(%rip)
+        movq v, %r11
+        movq $133, 0(%r11)
+        movq v, %r11
+        movq x1, 16(%r11)
+        movq $0, _
+        movq v, %r11
+        movq x0, 8(%r11)
+        movq $0, _
+        movq v, %rax
+        jmp one4396conclusion
+        
+     block4478:
+        movq %r15, %rdi
+        movq $24, %rsi
+        callq collect
+        jmp block4476
+        
+     block4480:
+        movq free_ptr(%rip), v
+        addq $16, free_ptr(%rip)
+        movq v, %r11
+        movq $3, 0(%r11)
+        movq v, %r11
+        movq x0, 8(%r11)
+        movq $0, _
+        movq v, %r11
+        movq 8(%r11), tmp4426
+        movq tmp4426, %rdi
+        movq $1, %rsi
+        callq *tmp4427
+        movq %rax, tmp4428
+        leaq 'one4396, tmp4429
+        movq tmp4428, %rdi
+        tailjmp tmp4429
+        
+     block4481:
+        movq $0, _
+        jmp block4480
+        
+     block4482:
+        movq %r15, %rdi
+        movq $16, %rsi
+        callq collect
+        jmp block4480
+        
+     block4484:
+        movq $42, x1
+        leaq 'zero4395, tmp4419
+        movq $20, %rdi
+        callq *tmp4419
+        movq %rax, x0
+        movq free_ptr(%rip), tmp4420
+        movq tmp4420, tmp4421
+        addq $24, tmp4421
+        movq fromspace_end(%rip), tmp4422
+        cmpq tmp4422, tmp4421
+        setl %al
+        movzbq %al, tmp4479
+        cmpq $1, tmp4479
+        je block4477
+        jmp block4478
+        
+     block4485:
+        leaq 'minus4394, tmp4427
+        movq x4402, x0
+        movq free_ptr(%rip), tmp4423
+        movq tmp4423, tmp4424
+        addq $16, tmp4424
+        movq fromspace_end(%rip), tmp4425
+        cmpq tmp4425, tmp4424
+        setl %al
+        movzbq %al, tmp4483
+        cmpq $1, tmp4483
+        je block4481
+        jmp block4482
+        
+     
+  )(define (two4397 ) : (Vector (Vector) Integer (Vector (Vector) Integer))
+      block4486:
+         movq free_ptr(%rip), v
+         addq $32, free_ptr(%rip)
+         movq v, %r11
+         movq $647, 0(%r11)
+         movq v, %r11
+         movq x2, 24(%r11)
+         movq $0, _
+         movq v, %r11
+         movq x1, 16(%r11)
+         movq $0, _
+         movq v, %r11
+         movq x0, 8(%r11)
+         movq $0, _
+         movq v, %rax
+         jmp two4397conclusion
+         
+      block4487:
+         movq $0, _
+         jmp block4486
+         
+      block4488:
+         movq %r15, %rdi
+         movq $32, %rsi
+         callq collect
+         jmp block4486
+         
+      block4490:
+         movq free_ptr(%rip), v
+         addq $16, free_ptr(%rip)
+         movq v, %r11
+         movq $3, 0(%r11)
+         movq v, %r11
+         movq x0, 8(%r11)
+         movq $0, _
+         movq v, %r11
+         movq 8(%r11), tmp4438
+         movq tmp4438, %rdi
+         movq $1, %rsi
+         callq *tmp4439
+         movq %rax, tmp4440
+         leaq 'two4397, tmp4441
+         movq tmp4440, %rdi
+         tailjmp tmp4441
+         
+      block4491:
+         movq $0, _
+         jmp block4490
+         
+      block4492:
+         movq %r15, %rdi
+         movq $16, %rsi
+         callq collect
+         jmp block4490
+         
+      block4494:
+         leaq 'one4396, tmp4430
+         movq $20, %rdi
+         callq *tmp4430
+         movq %rax, x2
+         movq $42, x1
+         leaq 'zero4395, tmp4431
+         movq $20, %rdi
+         callq *tmp4431
+         movq %rax, x0
+         movq free_ptr(%rip), tmp4432
+         movq tmp4432, tmp4433
+         addq $32, tmp4433
+         movq fromspace_end(%rip), tmp4434
+         cmpq tmp4434, tmp4433
+         setl %al
+         movzbq %al, tmp4489
+         cmpq $1, tmp4489
+         je block4487
+         jmp block4488
+         
+      block4495:
+         leaq 'minus4394, tmp4439
+         movq x4403, x0
+         movq free_ptr(%rip), tmp4435
+         movq tmp4435, tmp4436
+         addq $16, tmp4436
+         movq fromspace_end(%rip), tmp4437
+         cmpq tmp4437, tmp4436
+         setl %al
+         movzbq %al, tmp4493
+         cmpq $1, tmp4493
+         je block4491
+         jmp block4492
+         
+      two4397start:
+         movq %rdi, x4403
+         cmpq $0, x4403
+         je block4494
+         jmp block4495
+         
+      
+   )(define (three4398 ) : (Vector (Vector) Integer (Vector (Vector) Integer) (Vector (Vector) Integer (Vector (Vector) Integer)))
+       block4501:
+          movq $0, _
+          jmp block4500
+          
+       three4398start:
+          movq %rdi, x4404
+          cmpq $0, x4404
+          je block4504
+          jmp block4505
+          
+       block4496:
+          movq free_ptr(%rip), v
+          addq $40, free_ptr(%rip)
+          movq v, %r11
+          movq $1673, 0(%r11)
+          movq v, %r11
+          movq x3, 32(%r11)
+          movq $0, _
+          movq v, %r11
+          movq x2, 24(%r11)
+          movq $0, _
+          movq v, %r11
+          movq x1, 16(%r11)
+          movq $0, _
+          movq v, %r11
+          movq x0, 8(%r11)
+          movq $0, _
+          movq v, %rax
+          jmp three4398conclusion
+          
+       block4497:
+          movq $0, _
+          jmp block4496
+          
+       block4498:
+          movq %r15, %rdi
+          movq $40, %rsi
+          callq collect
+          jmp block4496
+          
+       block4500:
+          movq free_ptr(%rip), v
+          addq $16, free_ptr(%rip)
+          movq v, %r11
+          movq $3, 0(%r11)
+          movq v, %r11
+          movq x0, 8(%r11)
+          movq $0, _
+          movq v, %r11
+          movq 8(%r11), tmp4451
+          movq tmp4451, %rdi
+          movq $1, %rsi
+          callq *tmp4452
+          movq %rax, tmp4453
+          leaq 'three4398, tmp4454
+          movq tmp4453, %rdi
+          tailjmp tmp4454
+          
+       block4502:
+          movq %r15, %rdi
+          movq $16, %rsi
+          callq collect
+          jmp block4500
+          
+       block4504:
+          leaq 'two4397, tmp4442
+          movq $20, %rdi
+          callq *tmp4442
+          movq %rax, x3
+          leaq 'one4396, tmp4443
+          movq $20, %rdi
+          callq *tmp4443
+          movq %rax, x2
+          movq $42, x1
+          leaq 'zero4395, tmp4444
+          movq $20, %rdi
+          callq *tmp4444
+          movq %rax, x0
+          movq free_ptr(%rip), tmp4445
+          movq tmp4445, tmp4446
+          addq $40, tmp4446
+          movq fromspace_end(%rip), tmp4447
+          cmpq tmp4447, tmp4446
+          setl %al
+          movzbq %al, tmp4499
+          cmpq $1, tmp4499
+          je block4497
+          jmp block4498
+          
+       block4505:
+          leaq 'minus4394, tmp4452
+          movq x4404, x0
+          movq free_ptr(%rip), tmp4448
+          movq tmp4448, tmp4449
+          addq $16, tmp4449
+          movq fromspace_end(%rip), tmp4450
+          cmpq tmp4450, tmp4449
+          setl %al
+          movzbq %al, tmp4503
+          cmpq $1, tmp4503
+          je block4501
+          jmp block4502
+          
+       
+    )(define (main ) : Integer
+        mainstart:
+           leaq 'three4398, tmp4455
+           movq $20, %rdi
+           callq *tmp4455
+           movq %rax, x4
+           leaq 'two4397, tmp4456
+           movq $20, %rdi
+           callq *tmp4456
+           movq %rax, x3
+           leaq 'one4396, tmp4457
+           movq $20, %rdi
+           callq *tmp4457
+           movq %rax, x2
+           movq $42, x1
+           leaq 'zero4395, tmp4458
+           movq $20, %rdi
+           callq *tmp4458
+           movq %rax, x0
+           movq free_ptr(%rip), tmp4459
+           movq tmp4459, tmp4460
+           addq $48, tmp4460
+           movq fromspace_end(%rip), tmp4461
+           cmpq tmp4461, tmp4460
+           setl %al
+           movzbq %al, tmp4509
+           cmpq $1, tmp4509
+           je block4507
+           jmp block4508
+           
+        block4506:
+           movq free_ptr(%rip), v
+           addq $48, free_ptr(%rip)
+           movq v, %r11
+           movq $3723, 0(%r11)
+           movq v, %r11
+           movq x4, 40(%r11)
+           movq $0, _
+           movq v, %r11
+           movq x3, 32(%r11)
+           movq $0, _
+           movq v, %r11
+           movq x2, 24(%r11)
+           movq $0, _
+           movq v, %r11
+           movq x1, 16(%r11)
+           movq $0, _
+           movq v, %r11
+           movq x0, 8(%r11)
+           movq $0, _
+           movq v, %r11
+           movq 40(%r11), tmp4462
+           movq tmp4462, %r11
+           movq 32(%r11), tmp4463
+           movq tmp4463, %r11
+           movq 24(%r11), tmp4464
+           movq tmp4464, %r11
+           movq 16(%r11), %rax
+           jmp mainconclusion
+           
+        block4507:
+           movq $0, _
+           jmp block4506
+           
+        block4508:
+           movq %r15, %rdi
+           movq $48, %rsi
+           callq collect
+           jmp block4506
+           
+        
+     )
+
+
+
+encountered exception while testing 'r4`, case r4_14
