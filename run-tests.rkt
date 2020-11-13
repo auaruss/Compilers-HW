@@ -100,6 +100,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r4" type-check-R4 r4-passes interp-R4 "r4" (tests-for "r4"))
+#;(interp-tests "r4" type-check-R4 r4-passes interp-R4 "r4" (tests-for "r4"))
 (compiler-tests "r4" type-check-R4 r4-passes "r4" (tests-for "r4"))
 
