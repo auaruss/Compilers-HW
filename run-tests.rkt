@@ -12,7 +12,7 @@
 (require "interp.rkt")
 (require "compiler.rkt")
 (AST-output-syntax 'concrete-syntax)
-(debug-level 1)
+(debug-level 0)
 ;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
@@ -83,7 +83,7 @@
      ("build interference" ,build-interference ,interp-pseudo-x86-3)
      ("allocate registers" ,allocate-registers ,interp-x86-3)
      ("patch instructions" ,patch-instructions ,interp-x86-3)
-     #;("print x86" ,print-x86 #f)
+     ("print x86" ,print-x86 #f)
      ))
 
 (define all-tests
@@ -101,5 +101,5 @@
         all-tests)))
 
 (interp-tests "r4" type-check-R4 r4-passes interp-R4 "r4" (tests-for "r4"))
-#;(compiler-tests "r3" type-check-R3 r3-passes "r3" (tests-for "r3"))
+(compiler-tests "r4" type-check-R4 r4-passes "r4" (tests-for "r4"))
 

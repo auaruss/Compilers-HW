@@ -1749,7 +1749,7 @@
   (format "~a:\n\taddq\t$~a, %rsp\n\t~a\n\tpopq\t%rbp\n\tretq"
           (label-name "conclusion") (+ 8 (align stacksize 16)) callee-reg-str-pop)) ;; stack-space
 
-(define (make-main stack-size root-spills main)
+(define (make-main stack-size root-spills main label)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
@@ -1760,7 +1760,7 @@
                    (if main 
 		       (initialize-garbage-collector root-spills)
 		       (dont-initialize-garbage-collector root-spills))
-                   (list (Jmp 'start))))))
+                   (list (Jmp (symbol-append label 'start)))))))
 
 (define (make-conclusion stack-size root-spills)
   (let* ([push-bytes 32]
@@ -1801,7 +1801,7 @@
   (match instr
     [(IndirectCallq arg)
      (define st (stringify-arg arg))
-     (format "callq *~a" st)]
+     (format "callq\t*~a" st)]
     [(TailJmp arg)
      (define popframe
        (map (lambda (x) (Instr 'popq (list x)))
@@ -1875,8 +1875,8 @@
                                                       (make-conclusion (dict-ref info 'stack-space)
                                                                        (cdr (dict-ref info 'num-spills)))) 
                                                 (cons (cons label (if (equal? label 'main)
-								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #t)
-								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #f))) 
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #t label)
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #f label))) 
                                                       alist)))
                         (format "~a"
                                 (foldr string-append ""
