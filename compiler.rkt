@@ -1125,16 +1125,16 @@
                   [v_ (sel-ins-atm v)])
               (list
                (Instr 'cmpq (list atm2_ atm1_))
-               (Instr 'set (list 'e (Reg 'al)))
-               (Instr 'movzbq (list (Reg 'al) v_))))]
+               (Instr 'set (list 'e (ByteReg 'al)))
+               (Instr 'movzbq (list (ByteReg 'al) v_))))]
            [(Prim '< (list atm1 atm2))
            (let ([atm1_ (sel-ins-atm atm1)]
                   [atm2_ (sel-ins-atm atm2)]
                   [v_ (sel-ins-atm v)])
               (list
                (Instr 'cmpq (list atm2_ atm1_))
-               (Instr 'set (list 'l (Reg 'al)))
-               (Instr 'movzbq (list (Reg 'al) v_))))]))]))
+               (Instr 'set (list 'l (ByteReg 'al)))
+               (Instr 'movzbq (list (ByteReg 'al) v_))))]))]))
 
 ; sel-ins-tail : C1tail -> pseudo-x86
 ; takes in a c1 tail and converts it ot pseudo-x86
@@ -1353,8 +1353,9 @@
     [(Var x) (set x)]
     [(Reg r) (set r)]
     [(Deref r i) (set r)]
-    [(Global v) (set)#;(set v)]
+    [(Global v) (set)]
     [(Imm n) (set)]
+    [(ByteReg r) (set r)]
     [else (error "free vars, unhandled" arg)]))
 
 (define (write-vars^ instr)
@@ -1545,6 +1546,7 @@
     (match e
       [(FunRef lbl) (FunRef lbl)]
       [(Reg reg) (Reg reg)]
+      [(ByteReg r) (ByteReg r)]
       [(Imm int) (Imm int)]
       [(Deref v i) (Deref v i)]
       [(Var v) (if (vector-type? locals v)
@@ -1791,6 +1793,7 @@
      (format "~a(%rip)" (label-name name))]
     [(Imm n) (format "$~a" n)]
     [(Reg r) (format "%~a" r)]
+    [(ByteReg r) (format "%~a" r)]
     [(Deref r n) (format "~a(%~a)" n r)]))
 
 (define (stringify-in instr)
