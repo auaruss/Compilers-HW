@@ -1188,7 +1188,9 @@
                                           [`(,v : ,t)
                                            (Var v)])))
                          (define new-alist (for/list ([p alist])
-                                             (cons (car p) (Block '() (append (assign-regs-args args 0) (sel-ins-tail (cdr p) label))))))
+                                             (cons (car p) (Block '() (if (equal? (car p) (string->symbol (string-append (symbol->string label) "start")))
+									  (append (assign-regs-args args 0) (sel-ins-tail (cdr p) label))
+									  (sel-ins-tail (cdr p) label))))))
                          (Def label '() returntype
                               (dict-set info 'num-params (length paramtypes))
                               new-alist)])))
