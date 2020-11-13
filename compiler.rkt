@@ -1723,7 +1723,7 @@
            [(Def label paramtypes returntype info alist)
             (define new-alist (for/list ([p alist])
                                 (cons (car p)
-                                      (Block '() (patch-instructions-block (cdr p))))))
+                                      (patch-instructions-block (cdr p)))))
             (Def label paramtypes returntype info new-alist)])))
      (ProgramDefs info new-ds)]))
 
