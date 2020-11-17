@@ -1557,7 +1557,8 @@
                     (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin 
-			  (let ([location (* 8 (add1 (quotient (- colnum 10) 2)))])
+			  ;;(let ([location (* 8 (add1 (quotient (- colnum 10) 2)))])
+			  (let ([location (* 8 (quotient (- colnum 10) 2))])
                           (set-add! spilled-root location)
                           (Deref 'r15 location)))))
                   (let ([colnum (dict-ref coloring v)])
