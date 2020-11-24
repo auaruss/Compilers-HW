@@ -101,5 +101,5 @@
         all-tests)))
 
 (interp-tests "r4" type-check-R4 r4-passes interp-R4 "r4" (tests-for "r4") #;(list "14") #;(filter (lambda (v) (not (or (equal? v "26") (equal? v "12") (equal? v "14")))) (tests-for "r4")))
-(compiler-tests "r4" type-check-R4 r4-passes "r4" (tests-for "r4"))
+#;(compiler-tests "r4" type-check-R4 r4-passes "r4" (tests-for "r4"))
 
