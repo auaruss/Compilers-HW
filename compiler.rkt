@@ -472,6 +472,71 @@
                 (Def label paramtypes returntype info ((reveal-functions-exp functions-in-env) e))])))
       (ProgramDefs info revealed-definitions)])))
 
+(define convert-to-closures-exp
+  (λ (bound-vars)
+    (λ (exp)
+      (define recur (convert-to-closures-exp bound-vars))
+      (match exp
+        [(Var x) (Var x)]
+        [(FunRef f) (FunRef f)]
+        [(Int n) (Int n)]
+        [(Bool b) (Bool b)]
+        [(Let x e body)
+         (define recur-with-x-bound (convert-to-closures-exp (set-add bound-vars x)))
+         (Let x
+              (recur-with-x-bound e)
+              (recur-with-x-bound body))]
+        [(Apply f arg*) (Apply (recur f) (map recur arg*))]
+        [(Prim op es) (Prim op (map recur es))]
+        [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
+        [(Lambda paramtypes returntype e)
+         (define-values (free-vars-in-this-lambda var-types)
+           (free-vars (foldr (λ (elem acc) (set-add (car elem) acc)) bound-vars paramtypes)))
+         
+         (HasType
+          (Prim 'vector (cons (HasType (FunRef (gensym 'lambda)) returntype)
+                              free-vars-in-this-lambda))
+          (Vector (cons 'Void )]
+        [(HasType e t) (HasType (recur e) t)]))))
+
+(define free-vars
+  (λ (bound-vars)
+    (λ (exp)
+      (define recur (free-vars bound-vars))
+      (match exp
+        [(Var x)
+         (if (set-member? bound-vars x) (set) (set x))]
+        [(FunRef f) (set)]
+        [(Int n) (set)]
+        [(Bool b) (set)]
+        [(Let x e body)
+         (define recur-with-x-bound (free-vars (set-add bound-vars x)))
+         (recur-with-x-bound body)]
+        [(Apply f arg*)
+         (set-union (recur f) (foldr set-union (set) (map recur arg*)))]
+        [(Prim op es) (foldr set-union (set) (map recur es))]
+        [(If e1 e2 e3) (set-union (recur e1) (recur e2) (recur e3))]
+        [(Lambda paramtypes returntype e)
+         (define-values (free-vars-in-this-lambda var-types)
+           (free-vars (foldr (λ (elem acc) (set-add (car elem) acc)) bound-vars paramtypes)))
+         #;(HasType
+          (Prim 'vector (cons (HasType (FunRef (gensym 'lambda)) returntype)
+                              free-vars-in-this-lambda))
+          (Vector (cons 'Void )))]
+        [(HasType e t) (HasType (recur e) t)]))))
+
+(define convert-to-closures
+  (λ (p)
+    (match p
+      [(ProgramDefs info defns)
+       (define closure-converted-definitions
+         (map (λ (defn)
+                (match defn
+                  [(Def label paramtypes returntype info e)
+                   (Def label paramtypes returntype info ((convert-to-closures-exp (set)) e))]))
+              defns))
+       (ProgramDefs info closure-converted-definitions)])))
+
 (define limit-functions 
   (λ (p)
     (match p
