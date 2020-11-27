@@ -329,6 +329,7 @@
      (HasType (Apply (shrink-exp fs) new-es) type)]
     [(HasType (Let x e body) type)
      (HasType (Let x (shrink-exp e) (shrink-exp body)) type)]
+    [(HasType (Var f) type) (HasType (Var (string->symbol (string-replace (symbol->string f) "-" ""))) type)]
     [else e]
     ))
 
@@ -337,7 +338,8 @@
     [(ProgramDefsExp info ds e)
      (define new-ds (for/list ([d ds]) (match d
                                          [(Def f paramtypes rt info body)
-                                          (Def f paramtypes rt info (shrink-exp body))])))
+                                          (Def (string->symbol (string-replace (symbol->string f) "-" ""))
+                                               paramtypes rt info (shrink-exp body))])))
      (ProgramDefs info (append new-ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
     ))
 
@@ -1620,7 +1622,7 @@
                     (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
                         (begin 
-			  (let ([location (* 8 (add1 (quotient (- colnum 10) 2)))])
+			  (let ([location (* -8 (add1 (quotient (- colnum 11) 2)))])
                           (set-add! spilled-root location)
                           (Deref 'r15 location)))))
                   (let ([colnum (dict-ref coloring v)])
@@ -1630,7 +1632,7 @@
                         (begin
 			  (let ([location (* -8 (quotient (- colnum 10) 2))])
                           (set-add! spilled-stack location)
-                          (Deref 'rbp (- location 32)))))))]
+                          (Deref 'rbp (- location 40)))))))]
       [(Instr 'leaq (list arg reg)) (Instr 'leaq (list (allocate-registers-exp arg coloring locals)
                                                        (allocate-registers-exp reg coloring locals)))]
       [(Instr 'addq (list e1 e2)) (Instr 'addq (list (allocate-registers-exp e1 coloring locals)
@@ -1760,6 +1762,7 @@
     [(Instr 'cmpq (list e1 e2))
      (match e2
        [(Imm n) (list (Instr 'movq (list e2 (Reg 'rax))) (Instr 'cmpq (list e1 (Reg 'rax))))]
+       [(Deref a b) (list (Instr 'movq (list e2 (Reg 'rax))) (Instr 'cmpq (list e1 (Reg 'rax))))]
        [_ (list (Instr 'cmpq (list e1 e2)))])]
     [(Instr 'movzbq (list e1 e2))
      (match e2 
@@ -1814,7 +1817,7 @@
   (format "~a:\n\taddq\t$~a, %rsp\n\t~a\n\tpopq\t%rbp\n\tretq"
           (label-name "conclusion") (+ 8 (align stacksize 16)) callee-reg-str-pop)) ;; stack-space
 
-(define (make-main stack-size root-spills main)
+(define (make-main stack-size root-spills main label)
   (let* ([push-bytes 32]
          [stack-adjust (- (align (+ push-bytes stack-size) 16) push-bytes)])
     (Block '()
@@ -1825,7 +1828,7 @@
                    (if main 
 		       (initialize-garbage-collector root-spills)
 		       (dont-initialize-garbage-collector root-spills))
-                   (list (Jmp 'start))))))
+                   (list (Jmp (symbol-append label 'start)))))))
 
 (define (make-conclusion stack-size root-spills)
   (let* ([push-bytes 32]
@@ -1837,8 +1840,8 @@
                    (list (Instr 'popq (list (Reg 'rbp)))
                          (Retq))))))
 
-(define root-stack-size 16384)
-(define heap-size 16384)
+(define root-stack-size (expt 2 16))
+(define heap-size (expt 2 16))
 
 (define (initialize-garbage-collector root-spills)
   (append (list (Instr 'movq (list (Imm root-stack-size) (Reg 'rdi)))
@@ -1862,17 +1865,19 @@
     [(ByteReg r) (format "%~a" r)]
     [(Deref r n) (format "~a(%~a)" n r)]))
 
-(define (stringify-in instr)
+(define (stringify-in instr stack-size)
   (match instr
     [(IndirectCallq arg)
      (define st (stringify-arg arg))
-     (format "callq *~a" st)]
+     (format "callq\t*~a" st)]
     [(TailJmp arg)
-     (define popframe
+     (define popf
        (map (lambda (x) (Instr 'popq (list x)))
             (list (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx) (Reg 'rbp))))
+     (define popframe (let ([stack-adjust (- (align (+ 32 stack-size) 16) 32)])
+                        (cons (Instr 'addq (list (Imm stack-adjust) (Reg 'rsp))) popf)))
      (define popstring
-       (foldr (λ (inst rec) (string-append (stringify-in inst) "\n" rec)) "" popframe))
+       (foldr (λ (inst rec) (string-append (stringify-in inst stack-size) "\n" "\t" rec)) "" popframe))
      (define st (stringify-arg arg))
      (format "~ajmp\t*~a" popstring st)]
     [(Instr 'leaq (list arg reg))
@@ -1924,8 +1929,8 @@
      (format "j~a \t~a" cc (label-name lbl))]))
 
 ;; format-x86 : [instr] -> string
-(define (format-x86 ins)
-  (foldr (λ (f r) (string-append "\t" f "\n" r)) "" (map stringify-in ins)))
+(define (format-x86 ins stack-size)
+  (foldr (λ (f r) (string-append "\t" f "\n" r)) "" (map (λ (i) (stringify-in i stack-size)) ins)))
      
 ;(format "~a:\n\t" label)
 
@@ -1933,23 +1938,23 @@
 (define (print-x86 p)
   (match p
     [(ProgramDefs info ds)
-     (foldr string-append ""
+      (foldr string-append ""
             (for/list ([d ds])
               (match d [(Def label paramtypes returntype info alist)
                         (define new-alist (cons (cons (string->symbol (string-append (symbol->string label) "conclusion"))
                                                       (make-conclusion (dict-ref info 'stack-space)
                                                                        (cdr (dict-ref info 'num-spills)))) 
                                                 (cons (cons label (if (equal? label 'main)
-								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #t)
-								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #f))) 
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #t label)
+								      (make-main (dict-ref info 'stack-space) (cdr (dict-ref info 'num-spills)) #f label))) 
                                                       alist)))
                         (format "~a"
                                 (foldr string-append ""
                                        (for/list ([pair new-alist])
                                          (string-append (if (equal? (car pair) label) ;; .align 16 ?
-                                                            (format "\n\t.globl ~a\n~a"
+                                                            (format "\n\t.globl ~a\n\t.align 16\n~a"
                                                                     (label-name label)
                                                                     (label-name label))
                                                             (label-name (car pair)))
-                                                        ":\n" (format-x86 (Block-instr* (cdr pair)))))))])))]))
+                                                        ":\n" (format-x86 (Block-instr* (cdr pair)) (dict-ref info 'stack-space))))))])))]))
 
