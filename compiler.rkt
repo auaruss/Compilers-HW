@@ -280,7 +280,16 @@
        (ProgramDefsExp '() ds^ body^)]
       [else (error 'type-check "R4/type-check unmatched ~a" e)])))
 
-(define (type-check-R4 p)
+(define (type-check-R5 p)
+  (match p
+    [(Program info e)
+     (define new-p (ProgramDefsExp info '() e))
+     ((type-check '()) new-p)]
+    [(ProgramDefsExp info ds body)
+     ((type-check '()) p)]
+    ))
+
+#;(define (type-check-R4 p)
   (match p
     [(Program info e)
      (define new-p (ProgramDefsExp info '() e))
@@ -474,7 +483,9 @@
                 (Def label paramtypes returntype info ((reveal-functions-exp functions-in-env) e))])))
       (ProgramDefs info revealed-definitions)])))
 
-(define convert-to-closures-exp
+
+;; Closure Conversion
+#;(define convert-to-closures-exp
   (λ (bound-vars)
     (λ (exp)
       (define recur (convert-to-closures-exp bound-vars))
@@ -498,10 +509,10 @@
          (HasType
           (Prim 'vector (cons (HasType (FunRef (gensym 'lambda)) returntype)
                               free-vars-in-this-lambda))
-          (Vector (cons 'Void )]
+          `(Vector ,@(cons 'Void var-types)))]
         [(HasType e t) (HasType (recur e) t)]))))
 
-(define free-vars
+#;(define free-vars
   (λ (bound-vars)
     (λ (exp)
       (define recur (free-vars bound-vars))
@@ -527,7 +538,7 @@
           (Vector (cons 'Void )))]
         [(HasType e t) (HasType (recur e) t)]))))
 
-(define convert-to-closures
+#;(define convert-to-closures
   (λ (p)
     (match p
       [(ProgramDefs info defns)
@@ -539,6 +550,8 @@
               defns))
        (ProgramDefs info closure-converted-definitions)])))
 
+
+;; Limit Functions
 (define limit-functions 
   (λ (p)
     (match p
