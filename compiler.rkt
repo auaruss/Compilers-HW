@@ -232,16 +232,25 @@
          (error "branches of an if statement must be the same type, not" Te2 'and Te3))
        (values (HasType (If e1^ e2^ e3^) Te2) Te2)]
       [(Apply e es)
-       (define-values (e^ ty) ((type-check-exp env) e))
-       (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
-                                 ((type-check-exp env) e)))
-       (match ty
+        (define-values (e^ ty) ((type-check-exp env) e))
+        (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
+                                  ((type-check-exp env) e)))
+        (match ty
          [`(,ty^* ... -> ,rt)
           (for ([arg-ty ty*] [prm-ty ty^*])
           (unless (equal? arg-ty prm-ty)
             (error "argument ~a not equal to parameter ~a" arg-ty prm-ty)))
           (values (HasType (Apply e^ e*) rt) rt)]
-         [else (error "expected a function, not" ty)])]
+	 [else (error "expected a function, not" ty)])]
+      [(Lambda (and params (list `[,xs : ,Ts] ...)) rT body)
+        (define-values (new-body bodyT)
+	  ((type-check-exp (append (map cons xs Ts) env)) body))
+	(define ty `(,@Ts -> ,rT))
+	(cond
+	  [(equal? rT bodyT)
+	   (values (HasType (Lambda params rT new-body) ty) ty)]
+	  [else
+	    (error "mismatch in return type" bodyT rT)])] 
       [else
         (error "type-check-exp couldn't match" e)])))
 
@@ -310,6 +319,8 @@
      ((type-check '()) p)]
     ))
 
+
+(define r5_1 (parse-program `(program '() ((lambda: ([x : Integer]) : Integer x) 42))))
 
 ;;Shrink Pass: R4 -> R4
 (define (shrink-exp e)
