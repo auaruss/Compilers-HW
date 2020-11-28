@@ -93,7 +93,7 @@
 
 (define r5-passes
   `(
-     #;("shrink" ,shrink ,interp-R5)
+     ("shrink" ,shrink ,interp-R5)
      #;("uniquify" ,uniquify ,interp-R5)
      #;("reveal functions" ,reveal-functions ,interp-F2)
      #;("convert to closures" ,convert-to-closures ,interp-F2)

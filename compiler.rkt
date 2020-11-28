@@ -350,6 +350,8 @@
     [(HasType (Let x e body) type)
      (HasType (Let x (shrink-exp e) (shrink-exp body)) type)]
     [(HasType (Var f) type) (HasType (Var (string->symbol (string-replace (symbol->string f) "-" ""))) type)]
+    [(HasType (Lambda (and params (list `[,xs : ,Ts] ...)) rT body) type)
+     (HasType (Lambda params rT (shrink-exp body)) type)]
     [else e]
     ))
 
