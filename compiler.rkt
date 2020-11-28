@@ -479,6 +479,8 @@
         [(Apply f arg*) (Apply (recur f) (map recur arg*))]
         [(Prim op es) (Prim op (map recur es))]
         [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
+        [(Lambda (and params (list `[,xs : ,Ts] ...)) rT body)
+         (Lambda params rT (recur body))]
         [(HasType e t) (HasType (recur e) t)]))))
 
 
