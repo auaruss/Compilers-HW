@@ -350,6 +350,8 @@
     [(HasType (Let x e body) type)
      (HasType (Let x (shrink-exp e) (shrink-exp body)) type)]
     [(HasType (Var f) type) (HasType (Var (string->symbol (string-replace (symbol->string f) "-" ""))) type)]
+    [(HasType (Lambda (and params (list `[,xs : ,Ts] ...)) rT body) type)
+     (HasType (Lambda params rT (shrink-exp body)) type)]
     [else e]
     ))
 
@@ -418,6 +420,14 @@
          (define e* (for/list ([e (in-list es)])
                                    ((uniquify-exp symtab) e)))
          (Apply e^ e*)]
+	[(Lambda params rT body)
+         (define new-alist (for/list ([t params]) (match (car t)
+                                      [v (cons v (gensym v))])))
+         (define new-params (for/list ([t params]) (match t
+                                      [`(,v : ,type)
+                                       `(,(dict-ref new-alist v) : ,type)])))
+         (define combined-alist (hash-union symtab (make-immutable-hash new-alist)))
+	 (Lambda new-params rT ((uniquify-exp combined-alist) body))]
 	[(HasType e t)
 	 (HasType ((uniquify-exp symtab) e) t)]))))
 
