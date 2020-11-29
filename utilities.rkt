@@ -84,6 +84,7 @@ Changelog:
          (struct-out ValueOf)
          #;(struct-out TagOf)
          (struct-out Exit)
+         (struct-out Closure)
            
          (contract-out [struct Assign ((lhs lhs?) (rhs exp?))])
          (contract-out [struct Seq ((fst stmt?) (snd tail?))])
@@ -94,6 +95,7 @@ Changelog:
          (struct-out CollectionNeeded?)
          (struct-out GlobalValue)
          (struct-out Allocate)
+         (struct-out AllocateClosure)
          (struct-out AllocateProxy)
          (contract-out [struct Call ((fun exp?) (arg* exp-list?))])
          (contract-out [struct TailCall ((fun exp?) (arg* exp-list?))])
@@ -635,6 +637,28 @@ Changelog:
 (struct Project (value type)  #:transparent #:property prop:custom-print-quotable 'never)
 (struct Exit () #:transparent #:property prop:custom-print-quotable 'never)
   
+(struct Closure (arity fvs)
+  #:transparent #:property prop:custom-print-quotable 'never
+  #:methods gen:custom-write
+  [(define write-proc
+     (let ([csp (make-constructor-style-printer
+             (lambda (obj) 'Closure)
+             (lambda (obj) (list (Closure-arity obj)(Closure-fvs obj))))])
+       (lambda (ast port mode)
+     (cond [(eq? (AST-output-syntax) 'concrete-syntax)
+              (let ([recur (make-recur port mode)])
+                (match ast
+                  [(Closure arity fvs)
+                   (write-string "(closure " port)
+                   (recur arity port)
+                   (write-string " " port)
+                   (recur fvs port)
+                   (write-string ")" port)
+                   ]))]
+           [(eq? (AST-output-syntax) 'abstract-syntax)
+            (csp ast port mode)]
+           ))))])
+
 (struct FunRef (name) #:transparent #:property prop:custom-print-quotable 'never
   #:methods gen:custom-write
   [(define write-proc
@@ -663,10 +687,12 @@ Changelog:
               (let ([recur (make-recur port mode)])
                 (match ast
                   [(FunRefArity f n)
-                   (recur f port)
-                   (write-string "{" port)
+                   (write-string "(fun-ref-arity" port)
+                   (write-string " " port)
+                   (write-string (symbol->string f) port)
+                   (write-string " " port)
                    (recur n port)
-                   (write-string "}" port)
+                   (write-string ")" port)
                    ]))]
            [(eq? (AST-output-syntax) 'abstract-syntax)
             (csp ast port mode)]
@@ -835,6 +861,22 @@ Changelog:
           (write amount port)
           (write-string " " port)
           (write-type type port)
+          (write-string ")" port)
+          )
+        ]))])
+
+(struct AllocateClosure (amount type arity) #:transparent #:property prop:custom-print-quotable 'never
+  #:methods gen:custom-write
+  [(define (write-proc ast port mode)
+     (match ast
+       [(AllocateClosure len type arity)
+        (let-values ([(line col pos) (port-next-location port)])
+          (write-string "(allocate-closure " port)
+          (write len port)
+          (write-string " " port)
+          (write-type type port)
+          (write-string " " port)
+          (write arity port)
           (write-string ")" port)
           )
         ]))])
