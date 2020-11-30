@@ -626,7 +626,7 @@
                 (match defn
                   [(Def label paramtypes returntype info e)
                    (define-values (e^ deflist) (convert-to-closures-exp e))
-                   (append deflist (list (Def label (cons `[,(gensym 'fvs) : _] paramtypes) returntype info e^)))]))
+                   (append deflist (list (Def label (if (symbol=? label 'main) paramtypes (cons `[,(gensym 'fvs) : _] paramtypes)) returntype info e^)))]))
               defns))
        (ProgramDefs info (append* closure-converted-definitions))])))
 
