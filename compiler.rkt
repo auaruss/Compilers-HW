@@ -10,7 +10,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'concrete-syntax)
+(AST-output-syntax 'abstract-syntax)
 
 (define interp-F2
   (lambda (p)
@@ -520,7 +520,7 @@
       [(Var x) (values (Var x) '())]
       [(HasType (FunRefArity f n) t)
        (define t^ (convert-closure-type t))
-       (values (HasType (Closure n (list (FunRef f))) t^) '())]
+       (values (HasType (Closure n (list (HasType (FunRef f) t))) t^) '())]
       [(Int n) (values (Int n) '())]
       [(Bool b) (values (Bool b) '())]
       [(Let x e body)
@@ -533,10 +533,13 @@
         (append e-deflist body-deflist))]
       [(Apply f arg*)
        (define tmp (gensym 'app))
-       (define-values (f^ f-deflist) (recur f)) 
+       (define-values (f^ f-deflist) (recur f))
+       (define f^-type (match f^
+                         [(HasType f^^ t)
+                          t]))
        (define-values (arg*^ arg*-deflist) (for/lists (arg*^ arg*-deflist) ([arg arg*]) (recur arg)))
        (values
-        (Let tmp f^ (Apply (Prim 'vector-ref (list (Var tmp) (Int 0))) (cons (Var tmp) arg*^)))
+        (Let tmp f^ (Apply (Prim 'vector-ref (list (HasType (Var tmp) f^-type) (HasType (Int 0) 'Integer))) (cons (HasType (Var tmp) f^-type) arg*^)))
         (append f-deflist (append* arg*-deflist)))]
       [(Prim op es) 
        (define-values (es^ es-deflist) (for/lists (es^ es-deflist) ([e es]) (recur e)))
@@ -657,12 +660,16 @@
     [(Prim op es) (Prim op (map recur es))]
     [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
     [(HasType (FunRef x) t)
-     (define new-t (match (take t (- (length t) 2))
-                     [`(,ts ...)
-                      (if (> (length ts) 6)
-                          (append (take ts 5) (list `(Vector ,@(drop ts 5))) (drop t (- (length t) 2)))
-                          t)]))
+     (define new-t (if (list? t)
+                       (match (take t (- (length t) 2))
+                         [`(,ts ...)
+                          (if (> (length ts) 6)
+                              (append (take ts 5) (list `(Vector ,@(drop ts 5))) (drop t (- (length t) 2)))
+                              t)])
+                       t))
      (HasType (FunRef x) new-t)]
+    [(Closure arity es)
+     (Closure arity (map recur es))]
     [(HasType e t) (HasType (recur e) t)])))
 
 (define vectorize-expression
@@ -696,6 +703,8 @@
          (Apply (recur f) (map recur arg*)))]
     [(Prim op es) (Prim op (map recur es))]
     [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
+    [(Closure arity es)
+     (Closure arity (map recur es))]
     [(HasType e t) (HasType (recur e) t)])))
 
 (define r4p02 (parse-program `(program '() (define (add8  [a : Integer] [b : Integer] [c : Integer] [d : Integer] [e : Integer] [f : Integer] [g : Integer] [h : Integer]) : Integer
