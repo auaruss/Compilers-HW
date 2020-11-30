@@ -471,18 +471,18 @@
 (define r4p1 (ProgramDefsExp '() (list (Def 'id '([x : Integer]) 'Integer '() (Var 'x))) (Apply (Var 'id) (list (Int 42)))))
 
 (define reveal-functions-exp
-  (λ (functions)
+  (λ (functions alist)
     (λ (exp)
-      (define recur (reveal-functions-exp functions))
+      (define recur (reveal-functions-exp functions alist))
       (match exp
         [(Var x)
          (if (set-member? functions x)
-             (FunRef x)
+             (FunRefArity x (dict-ref alist x))
              (Var x))]
         [(Int n) (Int n)]
         [(Bool b) (Bool b)]
         [(Let x e body)
-         (define recur-with-let-overshadowing (reveal-functions-exp (set-remove functions x)))
+         (define recur-with-let-overshadowing (reveal-functions-exp (set-remove functions x) (dict-remove alist x)))
          (Let x
               (recur-with-let-overshadowing e)
               (recur-with-let-overshadowing body))]
@@ -499,49 +499,64 @@
     (match p
       [(ProgramDefs info defns)
        (define functions-in-env (list->set (map Def-name defns)))
+       (define functions-alist (map (lambda (d) (cons (Def-name d) (length (Def-param* d)))) defns))
        (define revealed-definitions
           (for/list ([defn defns])
             (match defn
               [(Def label paramtypes returntype info e)
-                (Def label paramtypes returntype info ((reveal-functions-exp functions-in-env) e))])))
+                (Def label paramtypes returntype info ((reveal-functions-exp functions-in-env functions-alist) e))])))
       (ProgramDefs info revealed-definitions)])))
 
 
 ;; Closure Conversion
-#;(define convert-to-closures-exp
-  (λ (bound-vars)
-    (λ (exp)
-      (define recur (convert-to-closures-exp bound-vars))
+(define convert-closure-type
+  (lambda (type)
+    (match type
+	   [`(,ts ... -> ,rt)
+	    (define ts^ (map convert-closure-type ts))
+	    (define rt^ (convert-closure-type rt))
+            `(Vector ((Vector _) ,@ts^ -> ,rt^))]
+	   [else type])))
+
+(define convert-to-closures-exp
+  (λ (exp)
+    (define recur convert-to-closures-exp)
       (match exp
         [(Var x) (Var x)]
-        [(FunRef f) (FunRef f)]
+        [(HasType (FunRefArity f n) t)
+	 (define t^ (convert-closure-type t))
+	 (HasType (Closure n (FunRef f) '()) t^)]
         [(Int n) (Int n)]
         [(Bool b) (Bool b)]
         [(Let x e body)
-         (define recur-with-x-bound (convert-to-closures-exp (set-add bound-vars x)))
          (Let x
-              (recur-with-x-bound e)
-              (recur-with-x-bound body))]
+            (recur e)
+            (recur body))]
         [(Apply f arg*) (Apply (recur f) (map recur arg*))]
+        [(Apply f arg*)
+         (define f^ (recur f))
+         (define arg*^ (map recur arg*))
+	 (define tmp (gensym 'app))
+         (Let tmp f^ (Apply (Prim 'vector-ref (Var tmp) 0) (Var tmp) arg*^))]
         [(Prim op es) (Prim op (map recur es))]
         [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
         [(Lambda paramtypes returntype e)
-         (define-values (free-vars-in-this-lambda var-types)
-           (free-vars (foldr (λ (elem acc) (set-add (car elem) acc)) bound-vars paramtypes)))
-         
+         (define free-var-pairs
+           (free-vars (set) #;(foldr (λ (elem acc) (set-add (car elem) acc)) bound-vars paramtypes)))
+         (define-values (names alist) (for/lists (names types) ([pr (set->list (free-var-pairs e)]) (values (car pr) pr)))
          (HasType
-          (Prim 'vector (cons (HasType (FunRef (gensym 'lambda)) returntype)
+          (Closure (length paramtypes) (cons (HasType (FunRef (gensym 'lambda)) returntype)
                               free-vars-in-this-lambda))
-          `(Vector ,@(cons 'Void var-types)))]
-        [(HasType e t) (HasType (recur e) t)]))))
+          `(Vector ,@(cons '(Vector _) var-types)))]
+        [(HasType e t) (HasType (recur e) t)])))
 
-#;(define free-vars
+(define free-vars
   (λ (bound-vars)
     (λ (exp)
       (define recur (free-vars bound-vars))
       (match exp
-        [(Var x)
-         (if (set-member? bound-vars x) (set) (set x))]
+        [(Hastype (Var x) t)
+         (if (set-member? bound-vars x) (set) (set (cons x t)))]
         [(FunRef f) (set)]
         [(Int n) (set)]
         [(Bool b) (set)]
@@ -553,15 +568,12 @@
         [(Prim op es) (foldr set-union (set) (map recur es))]
         [(If e1 e2 e3) (set-union (recur e1) (recur e2) (recur e3))]
         [(Lambda paramtypes returntype e)
-         (define-values (free-vars-in-this-lambda var-types)
+         (define free-vars-in-this-lambda
            (free-vars (foldr (λ (elem acc) (set-add (car elem) acc)) bound-vars paramtypes)))
-         #;(HasType
-          (Prim 'vector (cons (HasType (FunRef (gensym 'lambda)) returntype)
-                              free-vars-in-this-lambda))
-          (Vector (cons 'Void )))]
+	 (free-vars-in-this-lambda e)]
         [(HasType e t) (HasType (recur e) t)]))))
 
-#;(define convert-to-closures
+(define convert-to-closures
   (λ (p)
     (match p
       [(ProgramDefs info defns)
@@ -569,7 +581,7 @@
          (map (λ (defn)
                 (match defn
                   [(Def label paramtypes returntype info e)
-                   (Def label paramtypes returntype info ((convert-to-closures-exp (set)) e))]))
+                   (Def label paramtypes returntype info (convert-to-closures-exp e))]))
               defns))
        (ProgramDefs info closure-converted-definitions)])))
 

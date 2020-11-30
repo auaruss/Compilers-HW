@@ -1168,6 +1168,7 @@ Changelog:
     [(HasType e t) #t]
     [(Collect s) #t] ;; update figure in book? see expose-alloc-exp in vectors.rkt
     [(FunRef f) #t]
+    [(FunRefArity f i) #t]
     [(Call f e*) #t]
     [(Inject e t) #t]
     [(Project e t) #t]
