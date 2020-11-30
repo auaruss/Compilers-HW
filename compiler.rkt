@@ -10,7 +10,12 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'abstract-syntax)
+(AST-output-syntax 'concrete-syntax)
+
+(define interp-F2
+  (lambda (p)
+    ((send (new interp-R5-class)
+           interp-F '()) p)))
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -322,6 +327,22 @@
 
                          (+ 40 (procedure-arity f))
                          )))
+(define r5_26 (parse-program
+               `(program '() (define (cell) : (Integer -> (Integer -> Integer))
+                               (let ([vec (vector 0)])
+                                 (lambda: ([msg : Integer]) : (Integer -> Integer)
+                                   (if (eq? msg 0)
+                                       (lambda: ([dummy : Integer]) : Integer
+                                         (vector-ref vec 0))
+                                       (lambda: ([set : Integer]) : Integer
+                                         (let ([dummy (vector-set! vec 0 set)])
+                                           42))))))
+
+
+                         (let ([c (cell)])
+                           (let ([dummy ((c 0) 42)])
+                             ((c 1) 0)))
+                         )))
 
 
 ;;Shrink Pass: R5 -> R5
@@ -499,7 +520,7 @@
       [(Var x) (values (Var x) '())]
       [(HasType (FunRefArity f n) t)
        (define t^ (convert-closure-type t))
-       (values (HasType (Closure (add1 n) (list (FunRef f))) t^) '())]
+       (values (HasType (Closure n (list (FunRef f))) t^) '())]
       [(Int n) (values (Int n) '())]
       [(Bool b) (values (Bool b) '())]
       [(Let x e body)
@@ -570,7 +591,7 @@
         [(Bool b) (set)]
         [(Let x e body)
          (define recur-with-x-bound (free-vars (set-add bound-vars x)))
-         (recur-with-x-bound body)]
+         (set-union (recur e) (recur-with-x-bound body))]
         [(Apply f arg*)
          (set-union (recur f) (foldr set-union (set) (map recur arg*)))]
         [(Prim op es) (foldr set-union (set) (map recur es))]
@@ -595,7 +616,7 @@
        (ProgramDefs info (append* closure-converted-definitions))])))
 
 
-#;(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01)))))
+#;(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_26)))))
 
 ;; Limit Functions
 (define limit-functions 
