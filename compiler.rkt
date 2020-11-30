@@ -9,7 +9,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'abstract-syntax)
+(AST-output-syntax 'concrete-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -321,6 +321,16 @@
 
 
 (define r5_1 (parse-program `(program '() ((lambda: ([x : Integer]) : Integer x) 42))))
+(define r5_01 (parse-program `(program '() (define (f [x : Integer]) : (Integer -> Integer)
+                                             (let ([y 4])
+                                               (lambda: ([z : Integer]) : Integer
+                                                 (+ x (+ y z)))))
+
+                                       (let ([g (f 5)])
+                                         (let ([h (f 3)])
+                                           (+ (g 11) (h 15))))
+                                       )))
+
 
 ;;Shrink Pass: R4 -> R4
 (define (shrink-exp e)
@@ -525,7 +535,7 @@
       [(Var x) (values (Var x) '())]
       [(HasType (FunRefArity f n) t)
        (define t^ (convert-closure-type t))
-       (values (HasType (Closure n (FunRef f) '()) t^) '())]
+       (values (HasType (Closure (add1 n) (list (FunRef f))) t^) '())]
       [(Int n) (values (Int n) '())]
       [(Bool b) (values (Bool b) '())]
       [(Let x e body)
@@ -541,22 +551,22 @@
        (define-values (f^ f-deflist) (recur f)) 
        (define-values (arg*^ arg*-deflist) (for/lists (arg*^ arg*-deflist) ([arg arg*]) (recur arg)))
        (values
-        (Let tmp f^ (Apply (Prim 'vector-ref (Var tmp) 0) (Var tmp) arg*^))
+        (Let tmp f^ (Apply (Prim 'vector-ref (list (Var tmp) (Int 0))) (cons (Var tmp) arg*^)))
         (append f-deflist (append* arg*-deflist)))]
       [(Prim op es) 
-       (define-values (es^ es-deflist) (for/lists (es es-deflist) ([e es]) (recur e)))
+       (define-values (es^ es-deflist) (for/lists (es^ es-deflist) ([e es]) (recur e)))
        (values
         (Prim op es^)
         (append* es-deflist))]
       [(If e1 e2 e3) 
-       (define-values (es^ es-deflist) (for/lists (es es-deflist) ([e (list e1 e2 e3)]) (recur e)))
+       (define-values (es^ es-deflist) (for/lists (es^ es-deflist) ([e (list e1 e2 e3)]) (recur e)))
        (values
         (If (first es^) (second es^) (third es^))
         (append* es-deflist))]
       [(Lambda paramtypes returntype e)
        (define free-var-pairs
-         (free-vars (set) #;(foldr (λ (elem acc) (set-add (car elem) acc)) bound-vars paramtypes)))
-       (define-values (names alist) (for/lists (names types) ([pr (set->list (free-var-pairs e))]) (values (car pr) pr)))
+         (free-vars (foldr (λ (elem acc) (set-add acc (car elem))) (set) paramtypes)))
+       (define-values (names alist) (for/lists (names alist) ([pr (set->list (free-var-pairs e))]) (values (car pr) pr)))
        (define lambda-name (gensym 'lambda))
        (define-values (e^ deflist) (recur e))
        (define clos (gensym 'fvs))
@@ -568,7 +578,8 @@
                                                                       [`[,x : ,type]
                                                                        `[,x : ,(convert-closure-type type)]])))
               (convert-closure-type returntype)
-              (foldl (lambda (name acc) (begin 
+              '()
+	      (foldr (lambda (name acc) (begin 
                                           (set! i (add1 i))
                                           (Let name (Prim 'vector-ref (list (Var clos) (Int i))) acc))) e^ names)))
        (values (HasType
@@ -602,9 +613,9 @@
         [(If e1 e2 e3) (set-union (recur e1) (recur e2) (recur e3))]
         [(Lambda paramtypes returntype e)
          (define free-vars-in-this-lambda
-           (free-vars (foldr (λ (elem acc) (set-add (car elem) acc)) bound-vars paramtypes)))
+           (free-vars (foldr (λ (elem acc) (set-add acc (car elem))) bound-vars paramtypes)))
          (free-vars-in-this-lambda e)]
-        [(HasType e t) (HasType (recur e) t)]))))
+        [(HasType e t) (recur e)]))))
 
 (define convert-to-closures
   (λ (p)
@@ -615,10 +626,12 @@
                 (match defn
                   [(Def label paramtypes returntype info e)
                    (define-values (e^ deflist) (convert-to-closures-exp e))
-                   (append deflist (list (Def label paramtypes returntype info e^)))]))
+                   (append deflist (list (Def label (cons `[,(gensym fvs) : _] paramtypes) returntype info e^)))]))
               defns))
        (ProgramDefs info (append* closure-converted-definitions))])))
 
+
+(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01)))))
 
 ;; Limit Functions
 (define limit-functions 
