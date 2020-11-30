@@ -4,30 +4,18 @@
 (require racket/fixnum)
 (require "interp-R0.rkt")
 (require "interp-R1.rkt")
+(require "interp-R5.rkt")
 (require "interp.rkt")
 (require "utilities.rkt")
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'concrete-syntax)
+(AST-output-syntax 'abstract-syntax)
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
 (define-vertex-property globalCFG live-before-set)
 (define-vertex-property globalCFG function-label)
-
-(define r4_01 (parse-program `(program '()  (define (map-vec [f : (Integer -> Integer)]
-                                                             [v : (Vector Integer Integer)])
-                                              : (Vector Integer Integer)
-                                              (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
-                                       (define (add1 [x : Integer]) : Integer
-                                         (+ x 1))
-                                       (vector-ref (map-vec add1 (vector 0 41)) 1))))
-
-(define lecture-ex (parse-program `(program '() (define (add  [x : Integer] [y : Integer]) : Integer
-                                                  (+ x y))
-                                            (add 40 2))))
-;;(define r4_01prog (ProgramDefsExp '() r4_01))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; R0 examples
@@ -84,21 +72,8 @@
 (test-pe (parse-program `(program () (- (+ 3 (- 5))))))
 |#
 
-;; example program from lecture:
-#;(let ([v (vector 42)])
-    (let ([w (vector v)])
-      (let ([v^ (vector-ref w 0)])
-        (vector-ref v^ 0))))
 
-(define hw4ex (Let 'v (Prim 'vector (list (Int 42)))
-                   (Let 'w (Prim 'vector (list (Var 'v)))
-                        (Let 'v^ (Prim 'vector-ref (list (Var 'w) (Int 0)))
-                             (Prim 'vector-ref (list (Var 'v^) (Int 0)))))))
-
-(define hw4prog (Program '() hw4ex))
-
-
-;;Type-Check Pass: R4 -> R4
+;;Type-Check Pass: R5 -> R5
 
 (define (boolean-operator? op)
   (match op
@@ -187,9 +162,14 @@
 	  (values (HasType (Prim op (list e1^)) 'Integer) 'Integer)]
 	 ['not 
           (define-values (e1^ Te1) (recur e1))
-          (unless (equal? Te1 'Boolean)
+          (unless (equal? Te1 'Boolean) 
             (error "argument to a boolean operator must be a boolean, not" Te1))
-	  (values (HasType (Prim op (list e1^)) 'Boolean) 'Boolean)])]
+	  (values (HasType (Prim op (list e1^)) 'Boolean) 'Boolean)]
+	 ['procedure-arity 
+          (define-values (e1^ Te1) (recur e1))
+          (unless (and (list? Te1) (member '-> Te1))
+            (error "argument to a boolean operator must be a boolean, not" Te1))
+	  (values (HasType (Prim op (list e1^)) 'Integer) 'Integer)])]
       [(Prim op (list e1 e2))
        (match op
          ['eq? 
@@ -330,9 +310,21 @@
                                          (let ([h (f 3)])
                                            (+ (g 11) (h 15))))
                                        )))
+(define r5_12 (parse-program
+               `(program '() (let ([curry-add (lambda: ([x : Integer]) : (Integer -> Integer)
+                                                (lambda: ([y : Integer]) : Integer (+ x y)))])
+                               ((curry-add 20) 22))
+
+                         )))
+(define r5_15 (parse-program
+               `(program '() (define (f [x : Integer] [y : Integer]) : Integer
+                               x)
+
+                         (+ 40 (procedure-arity f))
+                         )))
 
 
-;;Shrink Pass: R4 -> R4
+;;Shrink Pass: R5 -> R5
 (define (shrink-exp e)
   (match e
     [(HasType (Prim '- (list e1 e2)) 'Integer) 
@@ -358,7 +350,7 @@
      (define new-es (for/list ([e es]) (shrink-exp e)))
      (HasType (Apply (shrink-exp fs) new-es) type)]
     [(HasType (Let x e body) type)
-     (HasType (Let x (shrink-exp e) (shrink-exp body)) type)]
+     (HasType (Let (string->symbol (string-replace (symbol->string x) "-" "")) (shrink-exp e) (shrink-exp body)) type)]
     [(HasType (Var f) type) (HasType (Var (string->symbol (string-replace (symbol->string f) "-" ""))) type)]
     [(HasType (Lambda (and params (list `[,xs : ,Ts] ...)) rT body) type)
      (HasType (Lambda params rT (shrink-exp body)) type)]
@@ -375,36 +367,8 @@
      (ProgramDefs info (append new-ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
     ))
 
-(define r4p26 (parse-program `(program '() (define (g [x : Integer]) : Integer
-  (let ([v (vector 1)])
-    (if (eq? x 0)
-        0
-        (g (- x (vector-ref v 0))))))
 
-(let ([v1 (vector 1)])
-(let ([v2 (vector 1)])
-(let ([v3 (vector 1)])
-(let ([v4 (vector 1)])
-(let ([v5 (vector 1)])
-(let ([v6 (vector 1)])
-(let ([v7 (vector 1)])
-(let ([v8 (vector 1)])
-(let ([v9 (vector 1)])
-(let ([v10 (vector 1)])
-(let ([y (g 1000)])    ;; a function call with live vector-typed variables.
-    (+ (+ 32 y)
-       (+ (vector-ref v1 0)
-       (+ (vector-ref v2 0)
-          (+ (vector-ref v3 0)
-             (+ (vector-ref v4 0)
-                (+ (vector-ref v5 0)
-                   (+ (vector-ref v6 0)
-                      (+ (vector-ref v7 0)
-                         (+ (vector-ref v8 0)
-                            (+ (vector-ref v9 0)
-                               (vector-ref v10 0))))))))))))))))))))))
-)))
-#;(shrink (type-check-R4 r4p26))
+#;(shrink (type-check-R5 r5_12))
 
 
 ;;Uniquify Pass: R4 -> R4
@@ -631,7 +595,7 @@
        (ProgramDefs info (append* closure-converted-definitions))])))
 
 
-(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01)))))
+#;(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01)))))
 
 ;; Limit Functions
 (define limit-functions 
