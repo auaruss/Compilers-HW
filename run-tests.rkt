@@ -96,7 +96,7 @@
      ("shrink" ,shrink ,interp-R5)
      ("uniquify" ,uniquify ,interp-R5)
      ("reveal functions" ,reveal-functions ,interp-F2)
-     #;("convert to closures" ,convert-to-closures ,interp-F2)
+     ("convert to closures" ,convert-to-closures ,interp-F2)
      #;("limit functions" ,limit-functions ,interp-F2)
      #;("expose allocation" ,expose-allocation ,interp-F2)
      #;("remove complex opera*" ,remove-complex-opera* ,interp-F2)
