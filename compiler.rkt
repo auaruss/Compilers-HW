@@ -520,7 +520,7 @@
       [(Var x) (values (Var x) '())]
       [(HasType (FunRefArity f n) t)
        (define t^ (convert-closure-type t))
-       (values (HasType (Closure n (list (HasType (FunRef f) t))) t^) '())]
+       (values (HasType (Closure n (list (HasType (FunRef f) '(Vector _)))) t^) '())]
       [(Int n) (values (Int n) '())]
       [(Bool b) (values (Bool b) '())]
       [(Let x e body)
@@ -538,8 +538,11 @@
                          [(HasType f^^ t)
                           t]))
        (define-values (arg*^ arg*-deflist) (for/lists (arg*^ arg*-deflist) ([arg arg*]) (recur arg)))
+       (define rt^ (last (second f^-type)))
        (values
-        (Let tmp f^ (Apply (Prim 'vector-ref (list (HasType (Var tmp) f^-type) (HasType (Int 0) 'Integer))) (cons (HasType (Var tmp) f^-type) arg*^)))
+        (HasType (Let tmp f^ (HasType (Apply (HasType (Prim 'vector-ref (list (HasType (Var tmp) f^-type)
+                                                                              (HasType (Int 0) 'Integer))) '(Vector _)) ;; ?
+                                             (cons (HasType (Var tmp) f^-type) arg*^)) rt^)) rt^) ;; ?
         (append f-deflist (append* arg*-deflist)))]
       [(Prim op es) 
        (define-values (es^ es-deflist) (for/lists (es^ es-deflist) ([e es]) (recur e)))
@@ -560,20 +563,24 @@
        (define clos (gensym 'fvs))
        (define vec-type `(Vector ,@(cons '_ (for/list ([name names]) (dict-ref alist name)))))
        (define i 0)
+       (define rt^ (convert-closure-type returntype))
        (define lambda-def 
          (Def lambda-name 
               (cons `[,clos : ,vec-type] (for/list ([p paramtypes]) (match p
                                                                       [`[,x : ,type]
                                                                        `[,x : ,(convert-closure-type type)]])))
-              (convert-closure-type returntype)
+              rt^
               '()
-	      (foldr (lambda (name acc) (begin 
+              (foldr (lambda (name acc) (begin 
                                           (set! i (add1 i))
-                                          (Let name (Prim 'vector-ref (list (Var clos) (Int i))) acc))) e^ names)))
-       (values (HasType
-                (Closure (length paramtypes) (cons (HasType (FunRef lambda-name) '_)
+                                          (HasType (Let name (HasType (Prim 'vector-ref (list (HasType (Var clos) vec-type)
+                                                                                              (HasType (Int i) 'Integer)))
+                                                                      (dict-ref alist name)) acc)
+                                                   (match e^
+                                                     [(HasType x t) t])))) e^ names)))
+       (values
+                (Closure (length paramtypes) (cons (HasType (FunRef lambda-name) '(Vector _))
                                                    (for/list ([name names]) (HasType (Var name) (dict-ref alist name)))))
-                vec-type)
                (cons lambda-def deflist))]
       [(HasType e t) 
        (define-values (e^ deflist) (recur e))
@@ -619,7 +626,7 @@
        (ProgramDefs info (append* closure-converted-definitions))])))
 
 
-#;(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_26)))))
+
 
 ;; Limit Functions
 (define limit-functions 
@@ -722,6 +729,63 @@
                                             (Def label paramtypes returntype info ((expose-allocation-exp '()) e))])))
        (ProgramDefs info new-ds)]))
 
+(define (expose-allocation-vec recur exps type clos-arity)
+  (define i 0)
+  (define bytes (* 8 (add1 (length exps))))
+  (foldl
+   (λ (elem acc)
+     (let* ([x (string->symbol (string-append "x" (number->string i)))]
+            [q (HasType (Let x (recur elem) acc) type)])
+       (set! i (add1 i))
+       q))
+   (let ([q (HasType
+             (Let '_
+                  (HasType
+                   (If (HasType (Prim '< (list
+                                          (HasType (Prim '+ (list (HasType (GlobalValue 'free_ptr) 'Integer)
+                                                                  (HasType (Int bytes) 'Integer))) 'Integer)
+                                          (HasType (GlobalValue 'fromspace_end) 'Integer))) 'Boolean)
+                       (HasType (Void) 'Void)
+                       (HasType (Collect bytes) 'Void)) 'Void)
+                  (HasType
+                   (Let 'v
+                        (HasType (if clos-arity
+                                     (AllocateClosure (length exps) type clos-arity)
+                                     (Allocate (length exps) type)) type)
+                        (HasType
+                         (foldl
+                          (λ (elem acc)
+                            (let* ([x (string->symbol (string-append "x" (number->string i)))]
+                                   [xtype (match type
+                                            [`(Vector ((Vector _) ,ts ... -> ,rt))
+                                             (unless (and (exact-nonnegative-integer? i) (< i (add1 (length ts))))
+                                               (error 'expose-allocation-exp "invalid index ~a exps:~a type: ~a" i exps type))
+                                             (list-ref (cons '(Vector _) (append ts (list rt))) i)]
+                                            [`(Vector ,ts ...)
+                                             (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
+                                               (error 'expose-allocation-exp "invalid index ~a for ~a" i ts))
+                                             (list-ref ts i)]
+                                            [else (error "expected a vector in vector-ref, not" type)])]
+                                   [q (HasType
+                                       (Let '_
+                                            (HasType (Prim
+                                                      'vector-set!
+                                                      (list (HasType (Var 'v) type)
+                                                            (HasType (Int i) 'Integer)
+                                                            (HasType (Var x)
+                                                                     xtype))) 'Void)
+                                            acc) type)])
+                              (set! i (add1 i))
+                              q
+                              ))
+                          (begin
+                            (set! i 0)
+                            (HasType (Var 'v) type))
+                          exps #;(map recur exps)) type)) type)) type)])
+     (begin (set! i 0)
+            q))
+   exps))
+
 (define (expose-allocation-exp env)
   (λ (e)
     (define recur (expose-allocation-exp env))
@@ -742,58 +806,16 @@
        (If (recur e1) (recur e2) (recur e3))]
       [(Apply f arg*) (Apply (recur f) (map recur arg*))]
       [(HasType (Prim 'vector exps) type)
-       (define i 0)
-       (define bytes (* 8 (add1 (length exps))))
-       (foldl
-        (λ (elem acc)
-          (let* ([x (string->symbol (string-append "x" (number->string i)))]
-	        [q (HasType (Let x (recur elem) acc) type)])
-            (set! i (add1 i))
-            q))
-        (let ([q (HasType
-                  (Let '_
-                       (HasType
-                        (If (HasType (Prim '< (list
-                                               (HasType (Prim '+ (list (HasType (GlobalValue 'free_ptr) 'Integer) (HasType (Int bytes) 'Integer))) 'Integer)
-                                               (HasType (GlobalValue 'fromspace_end) 'Integer))) 'Boolean)
-                            (HasType (Void) 'Void)
-                            (HasType (Collect bytes) 'Void)) 'Void)
-                       (HasType
-                        (Let 'v
-                             (HasType (Allocate (length exps) type) type)
-                             (HasType
-                              (foldl
-                               (λ (elem acc)
-                                 (let* ([x (string->symbol (string-append "x" (number->string i)))]
-                                        [xtype (match type
-                                                 [`(Vector ,ts ...)
-                                                  (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
-                                                    (error 'expose-allocation-exp "invalid index ~a" i))
-                                                  (list-ref ts i)]
-                                                 [else (error "expected a vector in vector-ref, not" type)])]
-                                        [q (HasType
-                                            (Let '_
-                                                 (HasType (Prim
-                                                           'vector-set!
-                                                           (list (HasType (Var 'v) type)
-                                                                 (HasType (Int i) 'Integer)
-                                                                 (HasType (Var x)
-                                                                          xtype))) 'Void)
-                                                 acc) type)])
-                                   (set! i (add1 i))
-                                   q
-                                   ))
-                               (begin
-                                 (set! i 0)
-                                 (HasType (Var 'v) type))
-                               exps #;(map recur exps)) type)) type)) type)])
-          (begin (set! i 0)
-                 q))
-          exps)]
+       (expose-allocation-vec recur exps type #f)]
+      [(HasType (Closure arity exps) type)
+       (expose-allocation-vec recur exps type arity)]
       [(HasType e t)
        (HasType (recur e) t)]
       [(Void) (Void)])))
 
+(expose-allocation
+(limit-functions (convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01))))))
+)
 
 ;; remove-complex-opera* : F1 -> F1
 (define (remove-complex-opera* p)
@@ -838,10 +860,14 @@
      (define tmp (gensym 'tmp))
      (values (HasType (Var tmp) t)
              `((,tmp . ,(HasType (GlobalValue name) t))))]
-    [(HasType (Allocate n t) t)
+    [(HasType (Allocate n t) ty)
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) t)
-             `((,tmp . ,(HasType (Allocate n t) t))))]
+     (values (HasType (Var tmp) ty)
+             `((,tmp . ,(HasType (Allocate n t) ty))))]
+    [(HasType (AllocateClosure n t ar) ty)
+     (define tmp (gensym 'tmp))
+     (values (HasType (Var tmp) ty)
+             `((,tmp . ,(HasType (AllocateClosure n t ar) ty))))]
     [(HasType (FunRef name) t)
      (define tmp (gensym 'tmp))
      (values (HasType (Var tmp) t)
@@ -893,6 +919,7 @@
     [(Collect n) (Collect n)]
     [(GlobalValue name) (GlobalValue name)]
     [(Allocate n t) (Allocate n t)]
+    [(AllocateClosure n t ar) (AllocateClosure n t ar)]
     [(HasType e t)
      (HasType (rco-exp e) t)]
     ))
