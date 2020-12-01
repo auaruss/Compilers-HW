@@ -321,6 +321,26 @@
                                ((curry-add 20) 22))
 
                          )))
+(define r5_13 (parse-program
+               `(program '() (define (f [x : Integer]) : (Integer -> Integer)
+                               (let ([y 4])
+                                 (lambda: ([z : Integer]) : Integer
+                                   (+ x (+ y z)))))
+
+                         (let ([g (if (eq? 0 0)
+                                      (f 5)
+                                      (lambda: ([x : Integer]) : Integer x))])
+                           (let ([h (if (< 0 1)
+                                        (f 3)
+                                        (if #t
+                                            (f 0)
+                                            (f 1)))])
+                             (- (+ (let ([k g])
+                                     (- (k 11)))
+                                   (let ([j h])
+                                     (- (j 15)))))))
+
+                         )))
 (define r5_15 (parse-program
                `(program '() (define (f [x : Integer] [y : Integer]) : Integer
                                x)
@@ -758,9 +778,11 @@
                             (let* ([x (string->symbol (string-append "x" (number->string i)))]
                                    [xtype (match type
                                             [`(Vector ((Vector _) ,ts ... -> ,rt))
-                                             (unless (and (exact-nonnegative-integer? i) (< i (add1 (length ts))))
+                                             #;(unless (and (exact-nonnegative-integer? i) (< i (add1 (length ts))))
                                                (error 'expose-allocation-exp "invalid index ~a exps:~a type: ~a" i exps type))
-                                             (list-ref (cons '(Vector _) (append ts (list rt))) i)]
+                                             #;(list-ref (cons '(Vector _) (append ts (list rt))) i)
+                                             (match (list-ref exps i)
+                                               [(HasType exp^ t^) t^])]
                                             [`(Vector ,ts ...)
                                              (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
                                                (error 'expose-allocation-exp "invalid index ~a for ~a" i ts))
@@ -813,9 +835,7 @@
        (HasType (recur e) t)]
       [(Void) (Void)])))
 
-(expose-allocation
-(limit-functions (convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01))))))
-)
+#;(expose-allocation (limit-functions (convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01)))))))
 
 ;; remove-complex-opera* : F1 -> F1
 (define (remove-complex-opera* p)
@@ -982,6 +1002,8 @@
      (values (Seq (Collect n) c) '())]
     [(Allocate n t)
      (values (Seq (Assign v (Allocate n t)) c) '())]
+    [(AllocateClosure n t arity)
+     (values (Seq (Assign v (AllocateClosure n t arity)) c) '())]
     [(GlobalValue name)
      (values (Seq (Assign v (GlobalValue name)) c) '())]
     [(Int n)
@@ -1018,8 +1040,8 @@
      (match c1tail
       [(Seq (Assign v e^) tail)
        (values (Seq (Assign v (HasType e^ t)) tail) let-binds)]
-      [(Seq (Collect n) tail)
-       (values (Seq (Collect n) tail) let-binds)])
+      [else
+       (values c1tail let-binds)])
      ]
     ))
 
@@ -1123,7 +1145,7 @@
                                           ])))
      (ProgramDefs (cons (cons 'locals localvars) info) new-ds)]))
 
-#;(explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02))))))))
+#;(explicate-control (remove-complex-opera* (expose-allocation (limit-functions (convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_13)))))))))
 
 
 ;;uncover-locals-helper : C3 list of blocks -> association list of locals and their types
@@ -1157,15 +1179,7 @@
                                       (Def label paramtypes returntype (dict-set info 'locals (append paramvars (uncover-locals-helper def-alist))) def-alist)])))
      (define new-locals (append* (for/list ([d new-ds]) (match d
                                      [(Def label paramtypes returntype info def-alist)
-                                      (dict-ref info 'locals)]))))
-     #;(define es (append* (for/list ([d new-ds]) (match d
-                                     [(Def label paramtypes returntype info def-alist)
-                                      def-alist]))))
-     #;(define paramvars (append* (for/list ([d ds]) (match d
-                                     [(Def label paramtypes returntype info def-alist)
-                                      (for/list ([param paramtypes]) (match param
-                                                                       [`(,v : ,t)
-                                                                        (cons v t)]))]))))
+                                      (dict-ref info 'locals)]))))         
      (ProgramDefs (dict-set info 'locals new-locals #;(append paramvars (uncover-locals-helper es))) new-ds)]))
 
 #;(uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))))))
@@ -1221,11 +1235,17 @@
 ;; (2) calculates the length of the type
 ;; (3) bitwise-or with length left-shifted 1 place and 1 (forwarding bit set)
 ;; (4) left-shift the type number by 7, bitwise-or with result of (3)
-(define (calculate-tag len T)
-  (let* ([type-num (arithmetic-shift (list->number (reverse (type->binary (cdr T)))) 7)]
-         [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
-         [res (bitwise-ior type-num type-len)])
-    res))
+(define (calculate-tag len T arity)
+  (if arity
+      (let* ([type-arity (arithmetic-shift arity 57)]
+             [type-num (arithmetic-shift (list->number (reverse (type->binary (cdr T)))) 7)]
+             [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
+             [res (bitwise-ior type-arity type-num type-len)])
+        res)
+      (let* ([type-num (arithmetic-shift (list->number (reverse (type->binary (cdr T)))) 7)]
+             [type-len (bitwise-ior (arithmetic-shift len 1) 1)]
+             [res (bitwise-ior type-num type-len)])
+        res)))
 
 ;; argument registers in order:
 (define ARGREGS '(rdi rsi rdx rcx r8 r9))
@@ -1267,11 +1287,17 @@
                                           (Instr 'movq (list (Reg 'rax) v))))]
            [(HasType e^ t) (sel-ins-stmt (Assign v e^))]
            [(Allocate len T)
-            (let ([tag (calculate-tag len T)]) 
+            (let ([tag (calculate-tag len T #f)]) 
               (list (Instr 'movq (list (Global 'free_ptr) v))
                     (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
                     (Instr 'movq (list v (Reg 'r11)))
-                    (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))] 
+                    (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))]
+           [(AllocateClosure len T arity)
+            (let ([tag (calculate-tag len T arity)]) 
+              (list (Instr 'movq (list (Global 'free_ptr) v))
+                    (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
+                    (Instr 'movq (list v (Reg 'r11)))
+                    (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))]
            [(Prim 'vector-ref (list atm (HasType (Int n) t)))
             (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) 
                   (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]

@@ -100,14 +100,14 @@
      ("limit functions" ,limit-functions ,interp-F2)
      ("expose allocation" ,expose-allocation ,interp-F2)
      ("remove complex opera*" ,remove-complex-opera* ,interp-F2)
-     #;("explicate control" ,explicate-control ,interp-C3)
-     #;("uncover locals" ,uncover-locals ,interp-C3)
-     #;("instruction selection" ,select-instructions ,interp-pseudo-x86-3)
-     #;("uncover live" ,uncover-live ,interp-pseudo-x86-3)
-     #;("build interference" ,build-interference ,interp-pseudo-x86-3)
-     #;("allocate registers" ,allocate-registers ,interp-x86-3)
-     #;("patch instructions" ,patch-instructions ,interp-x86-3)
-     #;("print x86" ,print-x86 #f)
+     ("explicate control" ,explicate-control ,interp-C3)
+     ("uncover locals" ,uncover-locals ,interp-C3)
+     ("instruction selection" ,select-instructions ,interp-pseudo-x86-3)
+     ("uncover live" ,uncover-live ,interp-pseudo-x86-3)
+     ("build interference" ,build-interference ,interp-pseudo-x86-3)
+     ("allocate registers" ,allocate-registers ,interp-x86-3)
+     ("patch instructions" ,patch-instructions ,interp-x86-3)
+     ("print x86" ,print-x86 #f)
      ))
 
 (define all-tests
@@ -124,6 +124,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r5" type-check-R5 r5-passes interp-R5 "r5" (tests-for "r5") #;(list "01") #;(filter (lambda (v) (not (or (equal? v "26") (equal? v "12") (equal? v "14")))) (tests-for "r4")))
+(interp-tests "r5" type-check-R5 r5-passes interp-R5 "r5" #;(tests-for "r5") #;(list "01") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 #;(compiler-tests "r4" type-check-R4 r4-passes "r4" (tests-for "r4"))
 
