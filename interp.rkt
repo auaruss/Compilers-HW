@@ -6,7 +6,7 @@
          interp-R1-class interp-R2-class interp-R3-class
 	 interp-R4-class interp-R5-class interp-R6-class
          interp-F1
-         interp-C2 interp-C3
+         interp-C2 interp-C3 interp-C4
          interp-pseudo-x86-0 interp-x86-0
          interp-pseudo-x86-1 interp-x86-1
          interp-pseudo-x86-2 interp-x86-2
@@ -33,6 +33,10 @@
 (define interp-C3
   (lambda (p)
     (send (new interp-R4-class) interp-C p)))
+
+(define interp-C4
+  (lambda (p)
+    (send (new interp-R5-class) interp-C p)))
 
 ;; Interpreters for x86 with names that correspond to the book.
 
