@@ -125,5 +125,5 @@
         all-tests)))
 
 (interp-tests "r5" type-check-R5 r5-passes interp-R5 "r5" #;(tests-for "r5") #;(list "01") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
-(compiler-tests "r5" type-check-R5 r5-passes "r5" (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
+(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 

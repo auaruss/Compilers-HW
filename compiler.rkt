@@ -1298,6 +1298,9 @@
                     (Instr 'addq (list (Imm (* 8 (add1 len))) (Global 'free_ptr)))
                     (Instr 'movq (list v (Reg 'r11)))
                     (Instr 'movq (list (Imm tag) (Deref 'r11 0)))))]
+           [(Prim 'procedure-arity (list f)) (list (Instr 'movq (list (sel-ins-atm f) (Reg 'r11)))
+                                                   (Instr 'movq (list (Deref 'r11 0) v))
+                                                   (Instr 'sarq (list (Imm 57) v)))]
            [(Prim 'vector-ref (list atm (HasType (Int n) t)))
             (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) 
                   (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]
@@ -1890,6 +1893,10 @@
 
 (define (patch-instructions-instr px86instr)
   (match px86instr
+    [(Instr 'movq (list (Imm n) (Deref r i))) (if (> n (expt 2 16))
+                                                  (list (Instr 'movq (list (Imm n) (Reg 'rax)))
+                                                        (Instr 'movq (list (Reg 'rax) (Deref r i))))
+                                                  (list px86instr))]
     [(IndirectCallq lbl) (list (IndirectCallq lbl))] ;; don't need to change this
     [(TailJmp arg)
      (match arg
