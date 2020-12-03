@@ -10,7 +10,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'abstract-syntax)
+(AST-output-syntax 'concrete-syntax)
 
 (define interp-F2
   (lambda (p)
@@ -550,7 +550,7 @@
       [(Var x) (values (Var x) '())]
       [(HasType (FunRefArity f n) t)
        (define t^ (convert-closure-type t))
-       (values (HasType (Closure n (list (HasType (FunRef f) '(Vector _)))) t^) '())]
+       (values (HasType (Closure n (list (HasType (FunRef f) '_))) t^) '())]
       [(Int n) (values (Int n) '())]
       [(Bool b) (values (Bool b) '())]
       [(Let x e body)
@@ -601,7 +601,7 @@
                                                                        `[,x : ,(convert-closure-type type)]])))
               rt^
               '()
-              (foldr (lambda (name acc) (begin 
+              (foldl (lambda (name acc) (begin 
                                           (set! i (add1 i))
                                           (HasType (Let name (HasType (Prim 'vector-ref (list (HasType (Var clos) vec-type)
                                                                                               (HasType (Int i) 'Integer)))
@@ -609,7 +609,7 @@
                                                    (match e^
                                                      [(HasType x t) t])))) e^ names)))
        (values
-                (Closure (length paramtypes) (cons (HasType (FunRef lambda-name) '(Vector _))
+                (Closure (length paramtypes) (cons (HasType (FunRef lambda-name) '_)
                                                    (for/list ([name names]) (HasType (Var name) (dict-ref alist name)))))
                (cons lambda-def deflist))]
       [(HasType e t) 
@@ -651,11 +651,11 @@
                 (match defn
                   [(Def label paramtypes returntype info e)
                    (define-values (e^ deflist) (convert-to-closures-exp e))
-                   (append deflist (list (Def label (if (symbol=? label 'main) paramtypes (cons `[,(gensym 'fvs) : _] paramtypes)) returntype info e^)))]))
+                   (append deflist (list (Def label (if (symbol=? label 'main) paramtypes (cons `[,(gensym 'fvs) : _] paramtypes)) (convert-closure-type returntype) info e^)))]))
               defns))
        (ProgramDefs info (append* closure-converted-definitions))])))
 
-#;(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_11)))))
+#;(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_01)))))
 
 
 ;; Limit Functions
@@ -1100,20 +1100,9 @@
      (values (IfStmt (Call f es) (Goto label1) (Goto label2))
              '())]
     [(Let x e body)
-     (define label1 (gensym 'block))
-     (define label2 (gensym 'block))
-     (add-vertex! globalCFG label1)
-     (instructions-set! label1 c1)
-     (live-before-set-set! label1 (list->set '()))
-     (function-label-set! label1 funlabel)
-     (add-vertex! globalCFG label2)
-     (instructions-set! label2 c2)
-     (live-before-set-set! label2 (list->set '()))
-     (function-label-set! label2 funlabel)
-     (define temp (gensym 'tmp))
-     (define-values (c1tail let-binds) (explicate-assign body (Var temp) (IfStmt (Prim 'eq? (list (Var temp) (Bool #t))) (Goto label1) (Goto label2)) funlabel))
-     (define-values (c1tail^ let-binds^) (explicate-assign e (Var x) c1tail funlabel))
-     (values c1tail^ (cons x (cons temp (append let-binds let-binds^))))
+     (define-values (body-block body-lets) (explicate-pred body c1 c2 funlabel))
+     (define-values (result result-lets) (explicate-assign e (Var x) body-block funlabel))
+     (values result (append body-lets result-lets))
      ]
     [(If e1 e2 e3)
      (define label1 (gensym 'block))
