@@ -315,6 +315,14 @@
                                          (let ([h (f 3)])
                                            (+ (g 11) (h 15))))
                                        )))
+(define r5_11 (parse-program
+		`(program '() 
+(define (f [x : Integer]) : (Integer -> Integer)
+  (lambda: ([y : Integer]) : Integer
+    (- x y)))
+
+((f (read)) (read)))))
+
 (define r5_12 (parse-program
                `(program '() (let ([curry-add (lambda: ([x : Integer]) : (Integer -> Integer)
                                                 (lambda: ([y : Integer]) : Integer (+ x y)))])
@@ -527,11 +535,13 @@
 (define convert-closure-type
   (lambda (type)
     (match type
-	   [`(,ts ... -> ,rt)
-	    (define ts^ (map convert-closure-type ts))
-	    (define rt^ (convert-closure-type rt))
-            `(Vector ((Vector _) ,@ts^ -> ,rt^))]
-	   [else type])))
+      [`(,ts ... -> ,rt)
+       (define ts^ (map convert-closure-type ts))
+       (define rt^ (convert-closure-type rt))
+       `(Vector ((Vector _) ,@ts^ -> ,rt^))]
+      [`(Vector ,ts ...)
+       `(Vector ,@(for/list ([t ts]) (convert-closure-type t)))]
+      [else type])))
 
 (define convert-to-closures-exp
   (λ (exp)
@@ -645,7 +655,7 @@
               defns))
        (ProgramDefs info (append* closure-converted-definitions))])))
 
-
+#;(convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_11)))))
 
 
 ;; Limit Functions
