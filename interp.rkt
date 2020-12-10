@@ -5,7 +5,7 @@
          R1-interp-x86 R2-interp-x86 R3-interp-x86
          interp-R1-class interp-R2-class interp-R3-class
 	 interp-R4-class interp-R5-class interp-R6-class
-         interp-F1
+         interp-R3-prime interp-F1 interp-F2
          interp-C2 interp-C3 interp-C4
          interp-pseudo-x86-0 interp-x86-0
          interp-pseudo-x86-1 interp-x86-1
@@ -20,11 +20,19 @@
 ;; and the C intermediate languages C0 and C1
 ;; are in separate files, e.g., interp-R0.rkt.
 
+(define interp-R3-prime
+  (lambda (p)
+    ((send (new interp-R3-class) interp-scheme '()) p)))
+
 (define interp-F1
   (lambda (p)
     ((send (new interp-R4-class) interp-F '()) p)))
 
-;; Interpreters for C2 and C3.
+(define interp-F2
+  (lambda (p)
+    ((send (new interp-R5-class) interp-F '()) p)))
+
+;; Interpreters for C2, C3, and C4.
 
 (define interp-C2
   (lambda (p)
@@ -38,7 +46,7 @@
   (lambda (p)
     (send (new interp-R5-class) interp-C p)))
 
-;; Interpreters for x86 with names that correspond to the book.
+;; Interpreters for various subsets of x86
 
 (define interp-pseudo-x86-0
   (lambda (p)
