@@ -10,7 +10,7 @@
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
-(AST-output-syntax 'concrete-syntax)
+(AST-output-syntax 'abstract-syntax)
 
 
 (define globalCFG (directed-graph '()))
@@ -310,73 +310,6 @@
     ))
 
 
-(define r5_1 (parse-program `(program '() ((lambda: ([x : Integer]) : Integer x) 42))))
-(define r5_01 (parse-program `(program '() (define (f [x : Integer]) : (Integer -> Integer)
-                                             (let ([y 4])
-                                               (lambda: ([z : Integer]) : Integer
-                                                 (+ x (+ y z)))))
-
-                                       (let ([g (f 5)])
-                                         (let ([h (f 3)])
-                                           (+ (g 11) (h 15))))
-                                       )))
-(define r5_11 (parse-program
-		`(program '() 
-(define (f [x : Integer]) : (Integer -> Integer)
-  (lambda: ([y : Integer]) : Integer
-    (- x y)))
-
-((f (read)) (read)))))
-
-(define r5_12 (parse-program
-               `(program '() (let ([curry-add (lambda: ([x : Integer]) : (Integer -> Integer)
-                                                (lambda: ([y : Integer]) : Integer (+ x y)))])
-                               ((curry-add 20) 22))
-
-                         )))
-(define r5_13 (parse-program
-               `(program '() (define (f [x : Integer]) : (Integer -> Integer)
-                               (let ([y 4])
-                                 (lambda: ([z : Integer]) : Integer
-                                   (+ x (+ y z)))))
-
-                         (let ([g (if (eq? 0 0)
-                                      (f 5)
-                                      (lambda: ([x : Integer]) : Integer x))])
-                           (let ([h (if (< 0 1)
-                                        (f 3)
-                                        (if #t
-                                            (f 0)
-                                            (f 1)))])
-                             (- (+ (let ([k g])
-                                     (- (k 11)))
-                                   (let ([j h])
-                                     (- (j 15)))))))
-
-                         )))
-(define r5_15 (parse-program
-               `(program '() (define (f [x : Integer] [y : Integer]) : Integer
-                               x)
-
-                         (+ 40 (procedure-arity f))
-                         )))
-(define r5_26 (parse-program
-               `(program '() (define (cell) : (Integer -> (Integer -> Integer))
-                               (let ([vec (vector 0)])
-                                 (lambda: ([msg : Integer]) : (Integer -> Integer)
-                                   (if (eq? msg 0)
-                                       (lambda: ([dummy : Integer]) : Integer
-                                         (vector-ref vec 0))
-                                       (lambda: ([set : Integer]) : Integer
-                                         (let ([dummy (vector-set! vec 0 set)])
-                                           42))))))
-
-
-                         (let ([c (cell)])
-                           (let ([dummy ((c 0) 42)])
-                             ((c 1) 0)))
-                         )))
-
 
 ;;Shrink Pass: R5 -> R5
 (define (shrink-exp e)
@@ -407,7 +340,7 @@
      (Let (string->symbol (string-replace (symbol->string x) "-" "")) (shrink-exp e) (shrink-exp body))]
     [(Var f)
      (Var (string->symbol (string-replace (symbol->string f) "-" "")))]
-    [(Lambda (and params (list `[,xs : ,Ts] ...)) rT body)
+    [(Lambda params rT body)
      (Lambda params rT (shrink-exp body))]
     [else e]
     ))
@@ -512,7 +445,7 @@
               #;(let [(not-found (λ () '()))]
                 (cons new-x (hash-ref symtab x not-found))))))
 
-;; uniquify : R1 -> R1
+;; uniquify : R'7 -> R'7
 (define (uniquify p)
   (match p
     [(ProgramDefs info ds)
@@ -531,9 +464,7 @@
      (ProgramDefs info new-ds)]
     ))
 
-#;(define uptoexpose (uniquify (shrink (type-check-R3 hw4prog))))
-(define r4p1 (ProgramDefsExp '() (list (Def 'id '([x : Integer]) 'Integer '() (Var 'x))) (Apply (Var 'id) (list (Int 42)))))
-
+;; Reveal Functions : R'7 -> R'7
 (define reveal-functions-exp
   (λ (functions alist)
     (λ (exp)
@@ -571,6 +502,113 @@
               [(Def label paramtypes returntype info e)
                 (Def label paramtypes returntype info ((reveal-functions-exp functions-in-env functions-alist) e))])))
       (ProgramDefs info revealed-definitions)])))
+
+
+;;Cast-Insert: R'7 -> R'6
+(define new-op?
+  (λ (op)
+    (match op
+      ['boolean? #t]
+      ['integer? #t]
+      ['vector? #t]
+      ['procedure? #t]
+      ['void? #t]
+      [else #f])))
+(define funref-helper
+  (λ (n)
+    (if (eqv? n 0)
+        '()
+        (append '(Any) (funref-helper (sub1 n))))))
+
+(define cast-insert-exp
+  (λ (e)
+    (define recur cast-insert-exp)
+    (match e
+      [(Void) (Inject (Void) 'void)]
+      [(Var x) (Var x)]
+      [(FunRefArity label arity) (Inject (FunRefArity label arity) (append (funref-helper arity) '(-> Any)))]
+      [(Int n)
+       (Inject (Int n) 'Integer)]
+      [(Bool b)
+       (Inject (Bool b) 'Boolean)]
+      [(Let x e body)
+       (Let x (recur e) (recur body))]
+      [(Apply f arg*)
+       (define lambda-type (append (for/list ([a arg*]) 'Any) '(-> Any)))
+       (define arg*^ (for/list ([a arg*]) (recur a)))
+       (Apply (Project (recur f) lambda-type)
+              arg*^)]
+      [(Prim '+ (list e1 e2))
+       (Inject (Prim '+ (list (Project (recur e1) 'Integer) (Project (recur e2) 'Integer))) 'Integer)]
+      [(Prim '< (list e1 e2))
+       (Inject (Prim '< (list (Project (recur e1) 'Integer) (Project (recur e2) 'Integer))) 'Boolean)]
+      [(Prim 'read '())
+       (Inject (Prim 'read '()) 'Integer)]
+      [(Prim '- (list e1))
+       (Inject (Prim '- (list (Project (recur e1) 'Integer))) 'Integer)]
+      [(Prim 'eq? (list e1 e2))
+       (Inject (Prim 'eq? (list (recur e1) (recur e2))) 'Boolean)]
+      [(Prim 'not (list e1))
+       (Inject (Prim 'not (list (Project (recur e1) 'Boolean))) 'Boolean)]
+      [(Prim op (list e1))
+       #:when (new-op? op)
+       (Inject (Prim op (list (recur e1))) 'Boolean)]
+      [(Prim 'vector es)
+       (define es^ (for/list ([e es]) (recur e)))
+       (Inject (Prim 'vector es^)
+               '(Vectorof Any))]
+      [(Prim 'vector-ref (list e1 e2))
+       (define tmp1 (gensym 'tmp))
+       (define tmp2 (gensym 'tmp))
+       (Let tmp1 (Project (recur e1) '(Vectorof Any))
+            (Let tmp2 (Project (recur e2) 'Integer)
+                 (Prim 'vector-ref (list (Var tmp1) (Var tmp2)))))]
+      [(Prim 'vector-set! (list e1 e2 e3))
+       (define tmp1 (gensym 'tmp))
+       (define tmp2 (gensym 'tmp))
+       (Let tmp1 (Project (recur e1) '(Vectorof Any))
+            (Let tmp2 (Project (recur e2) 'Integer)
+                 (Prim 'vector-set! (list (Var tmp1) (Var tmp2) (recur e3)))))]
+      [(If e1 e2 e3)
+       (If (Prim 'eq? (list (recur e1) (Inject (Bool #f) 'Boolean)))
+           (recur e3)
+           (recur e2))]
+      [(Lambda params rT body)
+       (define params^ (for/list ([p params]) `[,p : Any]))
+       (define body^ (recur body))
+       (define lambda-type (append (for/list ([p params]) 'Any) '(-> Any)))
+       (Inject
+        (Lambda params^ 'Any body^)
+        lambda-type)])))
+
+(define cast-insert 
+  (λ (p)
+    (match p
+      [(ProgramDefs info defns)
+       (define cast-definitions
+          (for/list ([defn defns])
+            (match defn
+              [(Def label paramtypes returntype info e)
+               (define paramtypes^ (for/list ([p paramtypes]) `[,p : Any]))
+               (Def label paramtypes^ returntype info (if (eqv? label 'main)
+                                                          (Project (cast-insert-exp e) 'Integer)
+                                                          (cast-insert-exp e)))])))
+      (ProgramDefs info cast-definitions)])))
+
+(define r7_3 (parse-program '(program () (define (id x) x)
+
+                                      (id 42)
+                                      )))
+(define r7_12 (parse-program '(program () (let ([f (lambda (x) x)])
+                                             (if (eq? f f)
+                                                 (- 45 3)
+                                                 777))
+                                       )))
+(define r7_17 (parse-program '(program () (let ([x (if (eq? (read) 1) 0 #f)])
+                                             (if (not x) 42 777))
+                                       )))
+
+#;(cast-insert (reveal-functions (uniquify (shrink (type-check-R7 r7_12)))))
 
 
 ;; Closure Conversion

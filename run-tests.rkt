@@ -114,12 +114,13 @@
      ("print x86" ,print-x86 #f)
      ))
 
+
 (define r7-passes
   `(
      ("shrink" ,shrink ,interp-R7-prog)
      ("uniquify" ,uniquify ,interp-R7-prog)
      ("reveal functions" ,reveal-functions ,interp-R7-prog)
-     ("cast insert" ,cast-insert ,interp-R6)
+     ("cast insert" ,cast-insert ,interp-F3)
      #;("check bounds" ,check-bounds ,interp-R6)
      #;("reveal casts" ,reveal-casts ,interp-R6)
      #;("convert to closures" ,convert-to-closures ,interp-F2)
@@ -150,6 +151,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" (tests-for "r7") #;(list "11") #;(filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
+(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" (tests-for "r7") #;(list "3") #;(filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 #;(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 
