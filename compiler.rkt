@@ -12,10 +12,6 @@
 (require racket/set)
 (AST-output-syntax 'concrete-syntax)
 
-(define interp-F2
-  (lambda (p)
-    ((send (new interp-R5-class)
-           interp-F '()) p)))
 
 (define globalCFG (directed-graph '()))
 (define-vertex-property globalCFG instructions)
@@ -274,6 +270,15 @@
        (ProgramDefsExp '() ds^ body^)]
       [else (error 'type-check "R4/type-check unmatched ~a" e)])))
 
+(define (type-check-R7 p)
+  (match p
+    [(Program info e)
+     (define new-p (ProgramDefsExp info '() e))
+     new-p]
+    [(ProgramDefsExp info ds body)
+     p]
+    ))
+
 (define (type-check-R5 p)
   (match p
     [(Program info e)
@@ -376,6 +381,39 @@
 ;;Shrink Pass: R5 -> R5
 (define (shrink-exp e)
   (match e
+    [(Prim '- (list e1 e2)) 
+     (Prim '+ (list (shrink-exp e1) (Prim '- (list (shrink-exp e2)))))]
+    [(Prim 'and (list e1 e2)) 
+     (If (shrink-exp e1) (If (shrink-exp e2) (shrink-exp e2) (Bool #f)) (Bool #f))]
+    [(Prim 'or (list e1 e2))
+     (If (shrink-exp e1) (shrink-exp e1) (If (shrink-exp e2) (shrink-exp e2)  (Bool #f)))]
+    [(Prim '<= (list e1 e2))
+     (Prim 'not (list (shrink-exp (Prim '> (list e1 e2)))))]
+    [(Prim '> (list e1 e2))
+     (let ([new-tmp (gensym 'tmp)]) 
+       (Let new-tmp (shrink-exp e1) (Prim '< (list (shrink-exp e2) (Var new-tmp)))))]
+    [(Prim '>= (list e1 e2)) 
+     (Prim 'not (list (shrink-exp (Prim '< (list e1 e2)))))]
+    [(Prim op (list e1))
+     (Prim op (list (shrink-exp e1)))]
+    [(Prim op (list e1 e2))
+     (Prim op (list (shrink-exp e1) (shrink-exp e2)))]
+    [(If e1 e2 e3)
+     (If (shrink-exp e1) (shrink-exp e2) (shrink-exp e3))]
+    [(Apply fs es)
+     (define new-es (for/list ([e es]) (shrink-exp e)))
+     (Apply (shrink-exp fs) new-es)]
+    [(Let x e body)
+     (Let (string->symbol (string-replace (symbol->string x) "-" "")) (shrink-exp e) (shrink-exp body))]
+    [(Var f)
+     (Var (string->symbol (string-replace (symbol->string f) "-" "")))]
+    [(Lambda (and params (list `[,xs : ,Ts] ...)) rT body)
+     (Lambda params rT (shrink-exp body))]
+    [else e]
+    ))
+
+#;(define (shrink-exp e)
+  (match e
     [(HasType (Prim '- (list e1 e2)) 'Integer) 
      (HasType (Prim '+ (list (shrink-exp e1) (HasType (Prim '- (list (shrink-exp e2))) 'Integer))) 'Integer)]
     [(HasType (Prim 'and (list e1 e2)) 'Boolean) 
@@ -416,8 +454,10 @@
      (ProgramDefs info (append new-ds (list (Def 'main '() 'Integer '() (shrink-exp e)))))]
     ))
 
-
-#;(shrink (type-check-R5 r5_12))
+(define r7_13 (parse-program '(program '()
+                                       (+ 2 (or 40 0))
+)))
+#;(shrink (type-check-R7 r7_13))
 
 
 ;;Uniquify Pass: R4 -> R4
@@ -425,6 +465,7 @@
   (λ (symtab)
     (λ (exp)
       (match exp
+        [(Void) (Void)]
         [(Var x)
          (Var (symbol-table-lookup symtab x))]
         [(Int n) (Int n)]
@@ -444,9 +485,9 @@
                                    ((uniquify-exp symtab) e)))
          (Apply e^ e*)]
 	[(Lambda params rT body)
-         (define new-alist (for/list ([t params]) (match (car t)
+         (define new-alist (for/list ([v params]) (cons v (gensym v))#;(match (car t)
                                       [v (cons v (gensym v))])))
-         (define new-params (for/list ([t params]) (match t
+         (define new-params (for/list ([v params]) (dict-ref new-alist v)#;(match t
                                       [`(,v : ,type)
                                        `(,(dict-ref new-alist v) : ,type)])))
          (define combined-alist (hash-union symtab (make-immutable-hash new-alist)))
@@ -480,9 +521,9 @@
                                              [name (cons name (gensym name))])))
      (define new-ds (for/list ([d ds]) (match d
 				         [(Def label paramtypes returntype info e)
-                                          (define new-alist^ (for/list ([t paramtypes]) (match (car t)
+                                          (define new-alist^ (for/list ([v paramtypes]) (cons v (gensym v))#;(match (car t)
                                                                                           [v (cons v (gensym v))])))
-                                          (define new-paramtypes (for/list ([t paramtypes]) (match t
+                                          (define new-paramtypes (for/list ([v paramtypes]) (dict-ref new-alist^ v)#;(match t
                                                                                               [`(,v : ,type)
                                                                                                `(,(dict-ref new-alist^ v) : ,type)])))
                                           (define combined-alist (append new-alist new-alist^))
@@ -498,6 +539,7 @@
     (λ (exp)
       (define recur (reveal-functions-exp functions alist))
       (match exp
+        [(Void) (Void)]
         [(Var x)
          (if (set-member? functions x)
              (FunRefArity x (dict-ref alist x))
@@ -512,7 +554,7 @@
         [(Apply f arg*) (Apply (recur f) (map recur arg*))]
         [(Prim op es) (Prim op (map recur es))]
         [(If e1 e2 e3) (If (recur e1) (recur e2) (recur e3))]
-        [(Lambda (and params (list `[,xs : ,Ts] ...)) rT body)
+        [(Lambda params rT body)
          (Lambda params rT (recur body))]
         [(HasType e t) (HasType (recur e) t)]))))
 
@@ -1187,7 +1229,7 @@
 
 ; atm? : c0exp -> bool
 
-(define (atm? c0exp)
+#;(define (atm? c0exp)
     (match c0exp
       [(HasType exp type) (atm? exp)]
       [(Int n) #t]
@@ -1277,14 +1319,14 @@
     [(HasType stmt type) (sel-ins-stmt stmt)]
     [(Collect n) (list (Instr 'movq (list (Reg 'r15) (Reg 'rdi)))
                        (Instr 'movq (list (Imm n) (Reg 'rsi)))
-                       (Callq 'collect))]
+                       (Callq 'collect 2))]
     [(Assign v e)
      (if (atm? e)
          (list (Instr 'movq (list (sel-ins-atm e) v)))
          (match e
            [(FunRef lbl) (list (Instr 'leaq (list (FunRef lbl) v)))] ;; think this is right
            [(Call fun args) (append (assign-arg-regs args 0)
-                                    (list (IndirectCallq (sel-ins-atm fun)) 
+                                    (list (IndirectCallq (sel-ins-atm fun) (length args)) 
                                           (Instr 'movq (list (Reg 'rax) v))))]
            [(HasType e^ t) (sel-ins-stmt (Assign v e^))]
            [(Allocate len T)
@@ -1312,7 +1354,7 @@
            [(GlobalValue name) (list (Instr 'movq (list (Global name) v)))] 
            [(Void) (list (Instr 'movq (list (Imm 0) v)))]
            [(Prim 'read '())
-            (list (Callq 'read_int)
+            (list (Callq 'read_int 0)
                   (Instr 'movq (list (Reg 'rax) v)))]
            [(Prim '- (list atm))
             (define x86atm (sel-ins-atm atm))
@@ -1356,7 +1398,7 @@
 (define (sel-ins-tail c0t name)
   (match c0t
     [(TailCall fun args) (append (assign-arg-regs args 0)
-                                 (list (TailJmp (sel-ins-atm fun))))]
+                                 (list (TailJmp (sel-ins-atm fun) (length args))))]
     [(HasType tail type) (sel-ins-tail tail name)]
     [(Return e)
      (let ([conc (string->symbol (string-append (symbol->string name) "conclusion"))])
@@ -1491,13 +1533,13 @@
      (set-union (instr-arg-varset e1) (instr-arg-varset e2))]
     [(Instr 'negq (list e1))
      (instr-arg-varset e1)]
-    [(Callq label)
+    [(Callq label arity)
      (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
           'rbx  'r12 'r13 'r14)]
-    [(IndirectCallq e1)
+    [(IndirectCallq e1 arity)
      (set-union (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
                      'rbx  'r12 'r13 'r14) (instr-arg-varset e1))]
-    [(TailJmp e1)
+    [(TailJmp e1 arity)
      (set-union (set 'rcx 'rdx 'rsi 'rdi 'r8 'r9 'r10
                      'rbx  'r12 'r13 'r14) (instr-arg-varset e1))]
     [_ (list->set '())]))
@@ -1579,9 +1621,9 @@
      (free-vars^ (last arg*))]
     [(JmpIf cc label) (set)]
     [(Jmp label) (set)]
-    [(Callq f) (set)]
-    [(TailJmp arg) (set)]
-    [(IndirectCallq arg) (set)]
+    [(Callq f arity) (set)]
+    [(TailJmp arg arity) (set)]
+    [(IndirectCallq arg arity) (set)]
     [else (error "write-vars unmatched" instr)]))
 
 (define (build-interference-instr^ live-after g locals)
@@ -1595,7 +1637,7 @@
                  [(equal? v d) (verbose "skip self edge on" d)]
                  [else (add-edge! g d v)])))
        ast]
-      [(or (IndirectCallq f) (Callq f))
+      [(or (IndirectCallq f arity) (Callq f arity))
        (define vector-vars
          (filter (lambda (x) (not (equal? x '())))
                  (for/list ([e locals]) (if (and (list? (cdr e))
@@ -1796,9 +1838,9 @@
       [(Instr 'set (list cc e)) (Instr 'set (list cc
                                                      (allocate-registers-exp e coloring locals)))]
       [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 coloring locals)))]
-      [(IndirectCallq lbl) (IndirectCallq (allocate-registers-exp lbl coloring locals))]
-      [(TailJmp arg) (TailJmp (allocate-registers-exp arg coloring locals))]
-      [(Callq l) (Callq l)]
+      [(IndirectCallq lbl arity) (IndirectCallq (allocate-registers-exp lbl coloring locals) arity)]
+      [(TailJmp arg arity) (TailJmp (allocate-registers-exp arg coloring locals) arity)]
+      [(Callq l arity) (Callq l arity)]
       [(Retq) (Retq)]
       [(Global var) (Global var)]
       [(Instr 'pushq (list e1)) (Instr 'pushq (list (allocate-registers-exp e1 coloring locals)))]
@@ -1898,12 +1940,12 @@
                                                   (list (Instr 'movq (list (Imm n) (Reg 'rax)))
                                                         (Instr 'movq (list (Reg 'rax) (Deref r i))))
                                                   (list px86instr))]
-    [(IndirectCallq lbl) (list (IndirectCallq lbl))] ;; don't need to change this
-    [(TailJmp arg)
+    [(IndirectCallq lbl arity) (list (IndirectCallq lbl arity))] ;; don't need to change this
+    [(TailJmp arg arity)
      (match arg
-       [(Reg 'rax) (list (TailJmp arg))]
+       [(Reg 'rax) (list (TailJmp arg arity))]
        [_ (list (Instr 'movq (list arg (Reg 'rax))) ;; this seems right
-                (TailJmp (Reg 'rax)))])]
+                (TailJmp (Reg 'rax) arity))])]
     [(Instr 'leaq (list f shouldbereg))
      (match shouldbereg
        [(Reg r) (list (Instr 'leaq (list f shouldbereg)))]
@@ -1996,7 +2038,7 @@
 (define (initialize-garbage-collector root-spills)
   (append (list (Instr 'movq (list (Imm root-stack-size) (Reg 'rdi)))
                 (Instr 'movq (list (Imm heap-size) (Reg 'rsi)))
-                (Callq 'initialize)
+                (Callq 'initialize 2)
                 (Instr 'movq (list (Global 'rootstack_begin) (Reg 'r15))))
 	  (for/list ([i root-spills]) (Instr 'movq (list (Imm 0) (Deref 'r15 (* i 8)))))
 	  (list (Instr 'addq (list (Imm (* 8 root-spills)) (Reg 'r15))))))
@@ -2017,10 +2059,10 @@
 
 (define (stringify-in instr stack-size)
   (match instr
-    [(IndirectCallq arg)
+    [(IndirectCallq arg arity)
      (define st (stringify-arg arg))
      (format "callq\t*~a" st)]
-    [(TailJmp arg)
+    [(TailJmp arg arity)
      (define popf
        (map (lambda (x) (Instr 'popq (list x)))
             (list (Reg 'r14) (Reg 'r13) (Reg 'r12) (Reg 'rbx) (Reg 'rbp))))
@@ -2064,7 +2106,7 @@
     [(Instr 'negq (list a))
      (define st (stringify-arg a))
      (format "negq\t~a" st)]
-    [(Callq lbl)
+    [(Callq lbl arity)
      (format "callq\t~a" (label-name lbl))]
     [(Retq) "retq"]
     [(Instr 'pushq (list arg))

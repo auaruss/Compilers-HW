@@ -1,17 +1,25 @@
 #! /usr/bin/env racket
 #lang racket
 
+#;(require "int_exp.rkt")
+#;(require "register_allocator.rkt")
+#;(require "conditionals.rkt")
+#;(require "vectors.rkt")
+#;(require "functions.rkt")
+#;(require "lambda.rkt")
 (require "utilities.rkt")
 #;(require "interp-R1.rkt")
 #;(require "interp-R2.rkt")
 #;(require "interp-R3.rkt")
-(require "interp-R5.rkt")
+#;(require "interp-R5.rkt")
+(require "interp-R6.rkt")
+(require "interp-R7.rkt")
 #;(require "interp-C0.rkt")
 #;(require "interp-C1.rkt")
 #;(require "interp-C2.rkt")
 (require "interp.rkt")
 (require "compiler.rkt")
-(AST-output-syntax 'concrete-syntax)
+(AST-output-syntax 'abstract-syntax)
 (debug-level 0)
 ;; (AST-output-syntax 'concrete-syntax)
 
@@ -86,12 +94,8 @@
      ("print x86" ,print-x86 #f)
      ))
 
-(define interp-F2 
-  (lambda (p)
-    ((send (new interp-R5-class)
-	   interp-F '()) p)))
 
-(define r5-passes
+#;(define r5-passes
   `(
      ("shrink" ,shrink ,interp-R5)
      ("uniquify" ,uniquify ,interp-R5)
@@ -110,6 +114,28 @@
      ("print x86" ,print-x86 #f)
      ))
 
+(define r7-passes
+  `(
+     ("shrink" ,shrink ,interp-R7-prog)
+     ("uniquify" ,uniquify ,interp-R7-prog)
+     ("reveal functions" ,reveal-functions ,interp-R7-prog)
+     ("cast insert" ,cast-insert ,interp-R6)
+     #;("check bounds" ,check-bounds ,interp-R6)
+     #;("reveal casts" ,reveal-casts ,interp-R6)
+     #;("convert to closures" ,convert-to-closures ,interp-F2)
+     #;("limit functions" ,limit-functions ,interp-F2)
+     #;("expose allocation" ,expose-allocation ,interp-F2)
+     #;("remove complex opera*" ,remove-complex-opera* ,interp-F2)
+     #;("explicate control" ,explicate-control ,interp-C4)
+     #;("uncover locals" ,uncover-locals ,interp-C4)
+     #;("instruction selection" ,select-instructions ,interp-pseudo-x86-3)
+     #;("uncover live" ,uncover-live ,interp-pseudo-x86-3)
+     #;("build interference" ,build-interference ,interp-pseudo-x86-3)
+     #;("allocate registers" ,allocate-registers ,interp-x86-3)
+     #;("patch instructions" ,patch-instructions ,interp-x86-3)
+     #;("print x86" ,print-x86 #f)
+     ))
+
 (define all-tests
   (map (lambda (p) (car (string-split (path->string p) ".")))
        (filter (lambda (p)
@@ -124,6 +150,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r5" type-check-R5 r5-passes interp-R5 "r5" #;(tests-for "r5") #;(list "11") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
-(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
+(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" (tests-for "r7") #;(list "11") #;(filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
+#;(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 
