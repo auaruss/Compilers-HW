@@ -1,0 +1,1519 @@
+utilities/read-program @ utilities.rkt:1671
+path:
+"tests/r7_16.rkt"
+
+
+utilities/read-program @ utilities.rkt:1677
+parsed-prog:
+(Program '() (Prim 'vector-ref (list (Prim 'vector (list (Int 42))) (Int 0))))
+
+
+type checker output: @ utilities.rkt:1757
+(strip-has-type tsexp):
+(ProgramDefsExp
+ '()
+ '()
+ (Prim 'vector-ref (list (Prim 'vector (list (Int 42))) (Int 0))))
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_16"
+
+expected-result:
+42
+
+
+running pass: shrink @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Prim 'vector-ref (list (Prim 'vector (list (Int 42))) (Int 0))))))
+
+
+looking for main in #0=({main . (tagged (function () #<Prim: vector-ref (#<Prim: vector (#<Int: 42>)> #<Int: 0>)> #0#) (-> Any))})
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_16"
+
+expected-result:
+42
+
+
+running pass: uniquify @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Prim 'vector-ref (list (Prim 'vector (list (Int 42))) (Int 0))))))
+
+
+looking for main in #0=({main . (tagged (function () #<Prim: vector-ref (#<Prim: vector (#<Int: 42>)> #<Int: 0>)> #0#) (-> Any))})
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_16"
+
+expected-result:
+42
+
+
+running pass: reveal functions @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Prim 'vector-ref (list (Prim 'vector (list (Int 42))) (Int 0))))))
+
+
+looking for main in #0=({main . (tagged (function () #<Prim: vector-ref (#<Prim: vector (#<Int: 42>)> #<Int: 0>)> #0#) (-> Any))})
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_16"
+
+expected-result:
+42
+
+
+running pass: cast insert @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Project
+    (Let
+     'tmp9270
+     (Project
+      (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+      '(Vectorof Any))
+     (Let
+      'tmp9271
+      (Project (Inject (Int 0) 'Integer) 'Integer)
+      (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+    'Integer))))
+
+
+initialize! @ interp.rkt:617
+
+allocate-page! @ interp.rkt:628
+name:
+'rootstack
+
+size:
+65536
+
+
+allocated @ interp.rkt:647
+name:
+'rootstack
+
+start-addr:
+808
+
+stop-addr:
+66344
+
+
+allocate-page! @ interp.rkt:628
+name:
+'fromspace
+
+size:
+65536
+
+
+allocated @ interp.rkt:647
+name:
+'fromspace
+
+start-addr:
+67144
+
+stop-addr:
+132680
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Def
+ 'main
+ '()
+ 'Integer
+ '()
+ (Project
+  (Let
+   'tmp9270
+   (Project
+    (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+    '(Vectorof Any))
+   (Let
+    'tmp9271
+    (Project (Inject (Int 0) 'Integer) 'Integer)
+    (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+  'Integer))
+
+result:
+(mcons
+ 'main
+ (list
+  'function
+  '()
+  (Project
+   (Let
+    'tmp9270
+    (Project
+     (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+     '(Vectorof Any))
+    (Let
+     'tmp9271
+     (Project (Inject (Int 0) 'Integer) 'Integer)
+     (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+   'Integer)))
+
+
+looking for main in #0=({main . (function () #<Project: #<Let: tmp9270 #<Project: #<Inject: #<Prim: vector (#<Inject: #<Int: 42> Integer>)> (Vector Any)> (Vectorof Any)> #<Let: tmp9271 #<Project: #<Inject: #<Int: 0> Integer> Integer> #<Prim: vector-ref (#<Var: tmp9270> #<Var: tmp9271>)>>> Integer> #0#)})
+R4/interp-F @ interp.rkt:1143
+ast:
+(Var 'main)
+
+result:
+#0=(list
+    'function
+    '()
+    (Project
+     (Let
+      'tmp9270
+      (Project
+       (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+       '(Vectorof Any))
+      (Let
+       'tmp9271
+       (Project (Inject (Int 0) 'Integer) 'Integer)
+       (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+     'Integer)
+    (list (mcons 'main #0#)))
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Var 'main)
+
+result:
+#0=(list
+    'function
+    '()
+    (Project
+     (Let
+      'tmp9270
+      (Project
+       (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+       '(Vectorof Any))
+      (Let
+       'tmp9271
+       (Project (Inject (Int 0) 'Integer) 'Integer)
+       (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+     'Integer)
+    (list (mcons 'main #0#)))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Var 'main)
+
+result:
+#0=(list
+    'function
+    '()
+    (Project
+     (Let
+      'tmp9270
+      (Project
+       (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+       '(Vectorof Any))
+      (Let
+       'tmp9271
+       (Project (Inject (Int 0) 'Integer) 'Integer)
+       (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+     'Integer)
+    (list (mcons 'main #0#)))
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(Int 42)
+
+result:
+42
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Int 42)
+
+result:
+42
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Int 42)
+
+result:
+42
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Inject (Int 42) 'Integer)
+
+result:
+'(tagged 42 Integer)
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Prim 'vector (list (Inject (Int 42) 'Integer)))
+
+result:
+'#((tagged 42 Integer))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+
+result:
+'(tagged #((tagged 42 Integer)) (Vector Any))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Project
+ (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+ '(Vectorof Any))
+
+result:
+'#((tagged 42 Integer))
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(Int 0)
+
+result:
+0
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Int 0)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Int 0)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Inject (Int 0) 'Integer)
+
+result:
+'(tagged 0 Integer)
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Project (Inject (Int 0) 'Integer) 'Integer)
+
+result:
+0
+
+
+looking for tmp9270 in ((tmp9271 . 0) (tmp9270 . #((tagged 42 Integer))) . #0=({main . (function () #<Project: #<Let: tmp9270 #<Project: #<Inject: #<Prim: vector (#<Inject: #<Int: 42> Integer>)> (Vector Any)> (Vectorof Any)> #<Let: tmp9271 #<Project: #<Inject: #<Int: 0> Integer> Integer> #<Prim: vector-ref (#<Var: tmp9270> #<Var: tmp9271>)>>> Integer> #0#)}))
+R4/interp-F @ interp.rkt:1143
+ast:
+(Var 'tmp9270)
+
+result:
+'#((tagged 42 Integer))
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Var 'tmp9270)
+
+result:
+'#((tagged 42 Integer))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Var 'tmp9270)
+
+result:
+'#((tagged 42 Integer))
+
+
+looking for tmp9271 in ((tmp9271 . 0) (tmp9270 . #((tagged 42 Integer))) . #0=({main . (function () #<Project: #<Let: tmp9270 #<Project: #<Inject: #<Prim: vector (#<Inject: #<Int: 42> Integer>)> (Vector Any)> (Vectorof Any)> #<Let: tmp9271 #<Project: #<Inject: #<Int: 0> Integer> Integer> #<Prim: vector-ref (#<Var: tmp9270> #<Var: tmp9271>)>>> Integer> #0#)}))
+R4/interp-F @ interp.rkt:1143
+ast:
+(Var 'tmp9271)
+
+result:
+0
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Var 'tmp9271)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Var 'tmp9271)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))
+
+result:
+'(tagged 42 Integer)
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(Let
+ 'tmp9271
+ (Project (Inject (Int 0) 'Integer) 'Integer)
+ (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271))))
+
+result:
+'(tagged 42 Integer)
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Let
+ 'tmp9271
+ (Project (Inject (Int 0) 'Integer) 'Integer)
+ (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271))))
+
+result:
+'(tagged 42 Integer)
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Let
+ 'tmp9271
+ (Project (Inject (Int 0) 'Integer) 'Integer)
+ (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271))))
+
+result:
+'(tagged 42 Integer)
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(Let
+ 'tmp9270
+ (Project
+  (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+  '(Vectorof Any))
+ (Let
+  'tmp9271
+  (Project (Inject (Int 0) 'Integer) 'Integer)
+  (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+
+result:
+'(tagged 42 Integer)
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Let
+ 'tmp9270
+ (Project
+  (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+  '(Vectorof Any))
+ (Let
+  'tmp9271
+  (Project (Inject (Int 0) 'Integer) 'Integer)
+  (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+
+result:
+'(tagged 42 Integer)
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Let
+ 'tmp9270
+ (Project
+  (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+  '(Vectorof Any))
+ (Let
+  'tmp9271
+  (Project (Inject (Int 0) 'Integer) 'Integer)
+  (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+
+result:
+'(tagged 42 Integer)
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Project
+ (Let
+  'tmp9270
+  (Project
+   (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+   '(Vectorof Any))
+  (Let
+   'tmp9271
+   (Project (Inject (Int 0) 'Integer) 'Integer)
+   (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+ 'Integer)
+
+result:
+42
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Apply (Var 'main) '())
+
+result:
+42
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Apply (Var 'main) '())
+
+result:
+42
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Project
+    (Let
+     'tmp9270
+     (Project
+      (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+      '(Vectorof Any))
+     (Let
+      'tmp9271
+      (Project (Inject (Int 0) 'Integer) 'Integer)
+      (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+    'Integer))))
+
+result:
+42
+
+
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_16"
+
+expected-result:
+42
+
+
+running pass: check bounds @ utilities.rkt:1785
+
+type-check-exp @ type-check-R5.rkt:39
+R5:
+"R5"
+
+e:
+(Let
+ 'tmp9270
+ (Project
+  (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+  '(Vectorof Any))
+ (Let
+  'tmp9271
+  (Project (Inject (Int 0) 'Integer) 'Integer)
+  (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+
+
+type-check-exp @ type-check-R1.rkt:37
+R1:
+"R1"
+
+e:
+(Let
+ 'tmp9270
+ (Project
+  (Inject (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+  '(Vectorof Any))
+ (Let
+  'tmp9271
+  (Project (Inject (Int 0) 'Integer) 'Integer)
+  (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271)))))
+
+
+type-check-exp @ type-check-R5.rkt:39
+R5:
+"R5"
+
+e:
+(Prim 'vector (list (Inject (Int 42) 'Integer)))
+
+
+type-check-exp @ type-check-R5.rkt:39
+R5:
+"R5"
+
+e:
+(Int 42)
+
+
+type-check-exp @ type-check-R1.rkt:37
+R1:
+"R1"
+
+e:
+(Int 42)
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'Integer
+
+t2:
+'Integer
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'(Vector Any)
+
+t2:
+'(Vector Any)
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'Any
+
+t2:
+'Any
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'Any
+
+t2:
+'Any
+
+
+type-check-exp @ type-check-R5.rkt:39
+R5:
+"R5"
+
+e:
+(Let
+ 'tmp9271
+ (Project (Inject (Int 0) 'Integer) 'Integer)
+ (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271))))
+
+
+type-check-exp @ type-check-R1.rkt:37
+R1:
+"R1"
+
+e:
+(Let
+ 'tmp9271
+ (Project (Inject (Int 0) 'Integer) 'Integer)
+ (Prim 'vector-ref (list (Var 'tmp9270) (Var 'tmp9271))))
+
+
+type-check-exp @ type-check-R5.rkt:39
+R5:
+"R5"
+
+e:
+(Int 0)
+
+
+type-check-exp @ type-check-R1.rkt:37
+R1:
+"R1"
+
+e:
+(Int 0)
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'Integer
+
+t2:
+'Integer
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'Any
+
+t2:
+'Any
+
+
+type-check-exp @ type-check-R5.rkt:39
+R5:
+"R5"
+
+e:
+(Var 'tmp9270)
+
+
+type-check-exp @ type-check-R5.rkt:39
+R5:
+"R5"
+
+e:
+(Var 'tmp9271)
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'Any
+
+t2:
+'Any
+
+
+type-equal? @ type-check-R5.rkt:21
+lenient:
+"lenient"
+
+t1:
+'Integer
+
+t2:
+'Integer
+
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Project
+    (Let
+     'tmp9270
+     (Project
+      (Inject
+       (HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+       '(Vector Any))
+      '(Vectorof Any))
+     (Let
+      'tmp9271
+      (Project (Inject (Int 0) 'Integer) 'Integer)
+      (Let
+       'v9273
+       (Var 'tmp9270)
+       (Let
+        'i9274
+        (Var 'tmp9271)
+        (If
+         (If
+          (Prim
+           'eq?
+           (list
+            (Inject
+             (Prim
+              'not
+              (list
+               (Project
+                (Let
+                 'tmp9275
+                 (Inject (Int 0) 'Integer)
+                 (Inject
+                  (Prim
+                   '<
+                   (list
+                    (Project (Var 'i9274) 'Integer)
+                    (Project (Var 'tmp9275) 'Integer)))
+                  'Boolean))
+                'Boolean)))
+             'Boolean)
+            (Inject (Bool #f) 'Boolean)))
+          (Inject (Bool #f) 'Boolean)
+          (If
+           (Prim
+            'eq?
+            (list
+             (Inject
+              (Prim
+               '<
+               (list
+                (Project (Var 'i9274) 'Integer)
+                (Project
+                 (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                 'Integer)))
+              'Boolean)
+             (Inject (Bool #f) 'Boolean)))
+           (Inject (Bool #f) 'Boolean)
+           (Inject
+            (Prim
+             '<
+             (list
+              (Project (Var 'i9274) 'Integer)
+              (Project
+               (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+               'Integer)))
+            'Boolean)))
+         (Prim 'vector-ref (list (Var 'v9273) (Var 'i9274)))
+         (Exit))))))
+    'Integer))))
+
+
+initialize! @ interp.rkt:617
+
+allocate-page! @ interp.rkt:628
+name:
+'rootstack
+
+size:
+65536
+
+
+allocated @ interp.rkt:647
+name:
+'rootstack
+
+start-addr:
+808
+
+stop-addr:
+66344
+
+
+allocate-page! @ interp.rkt:628
+name:
+'fromspace
+
+size:
+65536
+
+
+allocated @ interp.rkt:647
+name:
+'fromspace
+
+start-addr:
+67144
+
+stop-addr:
+132680
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Def
+ 'main
+ '()
+ 'Integer
+ '()
+ (Project
+  (Let
+   'tmp9270
+   (Project
+    (Inject
+     (HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+     '(Vector Any))
+    '(Vectorof Any))
+   (Let
+    'tmp9271
+    (Project (Inject (Int 0) 'Integer) 'Integer)
+    (Let
+     'v9273
+     (Var 'tmp9270)
+     (Let
+      'i9274
+      (Var 'tmp9271)
+      (If
+       (If
+        (Prim
+         'eq?
+         (list
+          (Inject
+           (Prim
+            'not
+            (list
+             (Project
+              (Let
+               'tmp9275
+               (Inject (Int 0) 'Integer)
+               (Inject
+                (Prim
+                 '<
+                 (list
+                  (Project (Var 'i9274) 'Integer)
+                  (Project (Var 'tmp9275) 'Integer)))
+                'Boolean))
+              'Boolean)))
+           'Boolean)
+          (Inject (Bool #f) 'Boolean)))
+        (Inject (Bool #f) 'Boolean)
+        (If
+         (Prim
+          'eq?
+          (list
+           (Inject
+            (Prim
+             '<
+             (list
+              (Project (Var 'i9274) 'Integer)
+              (Project
+               (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+               'Integer)))
+            'Boolean)
+           (Inject (Bool #f) 'Boolean)))
+         (Inject (Bool #f) 'Boolean)
+         (Inject
+          (Prim
+           '<
+           (list
+            (Project (Var 'i9274) 'Integer)
+            (Project
+             (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+             'Integer)))
+          'Boolean)))
+       (Prim 'vector-ref (list (Var 'v9273) (Var 'i9274)))
+       (Exit))))))
+  'Integer))
+
+result:
+(mcons
+ 'main
+ (list
+  'function
+  '()
+  (Project
+   (Let
+    'tmp9270
+    (Project
+     (Inject
+      (HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+      '(Vector Any))
+     '(Vectorof Any))
+    (Let
+     'tmp9271
+     (Project (Inject (Int 0) 'Integer) 'Integer)
+     (Let
+      'v9273
+      (Var 'tmp9270)
+      (Let
+       'i9274
+       (Var 'tmp9271)
+       (If
+        (If
+         (Prim
+          'eq?
+          (list
+           (Inject
+            (Prim
+             'not
+             (list
+              (Project
+               (Let
+                'tmp9275
+                (Inject (Int 0) 'Integer)
+                (Inject
+                 (Prim
+                  '<
+                  (list
+                   (Project (Var 'i9274) 'Integer)
+                   (Project (Var 'tmp9275) 'Integer)))
+                 'Boolean))
+               'Boolean)))
+            'Boolean)
+           (Inject (Bool #f) 'Boolean)))
+         (Inject (Bool #f) 'Boolean)
+         (If
+          (Prim
+           'eq?
+           (list
+            (Inject
+             (Prim
+              '<
+              (list
+               (Project (Var 'i9274) 'Integer)
+               (Project
+                (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                'Integer)))
+             'Boolean)
+            (Inject (Bool #f) 'Boolean)))
+          (Inject (Bool #f) 'Boolean)
+          (Inject
+           (Prim
+            '<
+            (list
+             (Project (Var 'i9274) 'Integer)
+             (Project
+              (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+              'Integer)))
+           'Boolean)))
+        (Prim 'vector-ref (list (Var 'v9273) (Var 'i9274)))
+        (Exit))))))
+   'Integer)))
+
+
+looking for main in #0=({main . (function () #<Project: #<Let: tmp9270 #<Project: #<Inject: #<HasType: #<Prim: vector (#<Inject: #<Int: 42> Integer>)> (Vector Any)> (Vector Any)> (Vectorof Any)> #<Let: tmp9271 #<Project: #<Inject: #<Int: 0> Integer> Integer> #<Let: v9273 #<Var: tmp9270> #<Let: i9274 #<Var: tmp9271> #<If: #<If: #<Prim: eq? (#<Inject: #<Prim: not (#<Project: #<Let: tmp9275 #<Inject: #<Int: 0> Integer> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Var: tmp9275> Integer>)> Boolean>> Boolean>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<If: #<Prim: eq? (#<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean>>> #<Prim: vector-ref (#<Var: v9273> #<Var: i9274>)> #(struct:Exit)>>>>> Integer> #0#)})
+R4/interp-F @ interp.rkt:1143
+ast:
+(Var 'main)
+
+result:
+#0=(list
+    'function
+    '()
+    (Project
+     (Let
+      'tmp9270
+      (Project
+       (Inject
+        (HasType
+         (Prim 'vector (list (Inject (Int 42) 'Integer)))
+         '(Vector Any))
+        '(Vector Any))
+       '(Vectorof Any))
+      (Let
+       'tmp9271
+       (Project (Inject (Int 0) 'Integer) 'Integer)
+       (Let
+        'v9273
+        (Var 'tmp9270)
+        (Let
+         'i9274
+         (Var 'tmp9271)
+         (If
+          (If
+           (Prim
+            'eq?
+            (list
+             (Inject
+              (Prim
+               'not
+               (list
+                (Project
+                 (Let
+                  'tmp9275
+                  (Inject (Int 0) 'Integer)
+                  (Inject
+                   (Prim
+                    '<
+                    (list
+                     (Project (Var 'i9274) 'Integer)
+                     (Project (Var 'tmp9275) 'Integer)))
+                   'Boolean))
+                 'Boolean)))
+              'Boolean)
+             (Inject (Bool #f) 'Boolean)))
+           (Inject (Bool #f) 'Boolean)
+           (If
+            (Prim
+             'eq?
+             (list
+              (Inject
+               (Prim
+                '<
+                (list
+                 (Project (Var 'i9274) 'Integer)
+                 (Project
+                  (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                  'Integer)))
+               'Boolean)
+              (Inject (Bool #f) 'Boolean)))
+            (Inject (Bool #f) 'Boolean)
+            (Inject
+             (Prim
+              '<
+              (list
+               (Project (Var 'i9274) 'Integer)
+               (Project
+                (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                'Integer)))
+             'Boolean)))
+          (Prim 'vector-ref (list (Var 'v9273) (Var 'i9274)))
+          (Exit))))))
+     'Integer)
+    (list (mcons 'main #0#)))
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Var 'main)
+
+result:
+#0=(list
+    'function
+    '()
+    (Project
+     (Let
+      'tmp9270
+      (Project
+       (Inject
+        (HasType
+         (Prim 'vector (list (Inject (Int 42) 'Integer)))
+         '(Vector Any))
+        '(Vector Any))
+       '(Vectorof Any))
+      (Let
+       'tmp9271
+       (Project (Inject (Int 0) 'Integer) 'Integer)
+       (Let
+        'v9273
+        (Var 'tmp9270)
+        (Let
+         'i9274
+         (Var 'tmp9271)
+         (If
+          (If
+           (Prim
+            'eq?
+            (list
+             (Inject
+              (Prim
+               'not
+               (list
+                (Project
+                 (Let
+                  'tmp9275
+                  (Inject (Int 0) 'Integer)
+                  (Inject
+                   (Prim
+                    '<
+                    (list
+                     (Project (Var 'i9274) 'Integer)
+                     (Project (Var 'tmp9275) 'Integer)))
+                   'Boolean))
+                 'Boolean)))
+              'Boolean)
+             (Inject (Bool #f) 'Boolean)))
+           (Inject (Bool #f) 'Boolean)
+           (If
+            (Prim
+             'eq?
+             (list
+              (Inject
+               (Prim
+                '<
+                (list
+                 (Project (Var 'i9274) 'Integer)
+                 (Project
+                  (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                  'Integer)))
+               'Boolean)
+              (Inject (Bool #f) 'Boolean)))
+            (Inject (Bool #f) 'Boolean)
+            (Inject
+             (Prim
+              '<
+              (list
+               (Project (Var 'i9274) 'Integer)
+               (Project
+                (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                'Integer)))
+             'Boolean)))
+          (Prim 'vector-ref (list (Var 'v9273) (Var 'i9274)))
+          (Exit))))))
+     'Integer)
+    (list (mcons 'main #0#)))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Var 'main)
+
+result:
+#0=(list
+    'function
+    '()
+    (Project
+     (Let
+      'tmp9270
+      (Project
+       (Inject
+        (HasType
+         (Prim 'vector (list (Inject (Int 42) 'Integer)))
+         '(Vector Any))
+        '(Vector Any))
+       '(Vectorof Any))
+      (Let
+       'tmp9271
+       (Project (Inject (Int 0) 'Integer) 'Integer)
+       (Let
+        'v9273
+        (Var 'tmp9270)
+        (Let
+         'i9274
+         (Var 'tmp9271)
+         (If
+          (If
+           (Prim
+            'eq?
+            (list
+             (Inject
+              (Prim
+               'not
+               (list
+                (Project
+                 (Let
+                  'tmp9275
+                  (Inject (Int 0) 'Integer)
+                  (Inject
+                   (Prim
+                    '<
+                    (list
+                     (Project (Var 'i9274) 'Integer)
+                     (Project (Var 'tmp9275) 'Integer)))
+                   'Boolean))
+                 'Boolean)))
+              'Boolean)
+             (Inject (Bool #f) 'Boolean)))
+           (Inject (Bool #f) 'Boolean)
+           (If
+            (Prim
+             'eq?
+             (list
+              (Inject
+               (Prim
+                '<
+                (list
+                 (Project (Var 'i9274) 'Integer)
+                 (Project
+                  (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                  'Integer)))
+               'Boolean)
+              (Inject (Bool #f) 'Boolean)))
+            (Inject (Bool #f) 'Boolean)
+            (Inject
+             (Prim
+              '<
+              (list
+               (Project (Var 'i9274) 'Integer)
+               (Project
+                (Inject (Prim 'vector-length (list (Var 'v9273))) 'Integer)
+                'Integer)))
+             'Boolean)))
+          (Prim 'vector-ref (list (Var 'v9273) (Var 'i9274)))
+          (Exit))))))
+     'Integer)
+    (list (mcons 'main #0#)))
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(Int 42)
+
+result:
+42
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Int 42)
+
+result:
+42
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Int 42)
+
+result:
+42
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Inject (Int 42) 'Integer)
+
+result:
+'(tagged 42 Integer)
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Prim 'vector (list (Inject (Int 42) 'Integer)))
+
+result:
+'#((tagged 42 Integer))
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+
+result:
+'#((tagged 42 Integer))
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+
+result:
+'#((tagged 42 Integer))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+
+result:
+'#((tagged 42 Integer))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Inject
+ (HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+ '(Vector Any))
+
+result:
+'(tagged #((tagged 42 Integer)) (Vector Any))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Project
+ (Inject
+  (HasType (Prim 'vector (list (Inject (Int 42) 'Integer))) '(Vector Any))
+  '(Vector Any))
+ '(Vectorof Any))
+
+result:
+'#((tagged 42 Integer))
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(Int 0)
+
+result:
+0
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Int 0)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Int 0)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Inject (Int 0) 'Integer)
+
+result:
+'(tagged 0 Integer)
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Project (Inject (Int 0) 'Integer) 'Integer)
+
+result:
+0
+
+
+looking for tmp9270 in ((tmp9271 . 0) (tmp9270 . #((tagged 42 Integer))) . #0=({main . (function () #<Project: #<Let: tmp9270 #<Project: #<Inject: #<HasType: #<Prim: vector (#<Inject: #<Int: 42> Integer>)> (Vector Any)> (Vector Any)> (Vectorof Any)> #<Let: tmp9271 #<Project: #<Inject: #<Int: 0> Integer> Integer> #<Let: v9273 #<Var: tmp9270> #<Let: i9274 #<Var: tmp9271> #<If: #<If: #<Prim: eq? (#<Inject: #<Prim: not (#<Project: #<Let: tmp9275 #<Inject: #<Int: 0> Integer> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Var: tmp9275> Integer>)> Boolean>> Boolean>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<If: #<Prim: eq? (#<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean>>> #<Prim: vector-ref (#<Var: v9273> #<Var: i9274>)> #(struct:Exit)>>>>> Integer> #0#)}))
+R4/interp-F @ interp.rkt:1143
+ast:
+(Var 'tmp9270)
+
+result:
+'#((tagged 42 Integer))
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Var 'tmp9270)
+
+result:
+'#((tagged 42 Integer))
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Var 'tmp9270)
+
+result:
+'#((tagged 42 Integer))
+
+
+looking for tmp9271 in ((v9273 . #0=#((tagged 42 Integer))) (tmp9271 . 0) (tmp9270 . #0#) . #1=({main . (function () #<Project: #<Let: tmp9270 #<Project: #<Inject: #<HasType: #<Prim: vector (#<Inject: #<Int: 42> Integer>)> (Vector Any)> (Vector Any)> (Vectorof Any)> #<Let: tmp9271 #<Project: #<Inject: #<Int: 0> Integer> Integer> #<Let: v9273 #<Var: tmp9270> #<Let: i9274 #<Var: tmp9271> #<If: #<If: #<Prim: eq? (#<Inject: #<Prim: not (#<Project: #<Let: tmp9275 #<Inject: #<Int: 0> Integer> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Var: tmp9275> Integer>)> Boolean>> Boolean>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<If: #<Prim: eq? (#<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean>>> #<Prim: vector-ref (#<Var: v9273> #<Var: i9274>)> #(struct:Exit)>>>>> Integer> #1#)}))
+R4/interp-F @ interp.rkt:1143
+ast:
+(Var 'tmp9271)
+
+result:
+0
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Var 'tmp9271)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Var 'tmp9271)
+
+result:
+0
+
+
+R4/interp-F @ interp.rkt:1143
+ast:
+(Int 0)
+
+result:
+0
+
+
+R5/interp-F result of @ interp.rkt:1461
+ast:
+(Int 0)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Int 0)
+
+result:
+0
+
+
+R6/interp-F result of @ interp.rkt:1611
+ast:
+(Inject (Int 0) 'Integer)
+
+result:
+'(tagged 0 Integer)
+
+
+looking for i9274 in ((tmp9275 tagged 0 Integer) (i9274 . 0) (v9273 . #0=#((tagged 42 Integer))) (tmp9271 . 0) (tmp9270 . #0#) . #1=({main . (function () #<Project: #<Let: tmp9270 #<Project: #<Inject: #<HasType: #<Prim: vector (#<Inject: #<Int: 42> Integer>)> (Vector Any)> (Vector Any)> (Vectorof Any)> #<Let: tmp9271 #<Project: #<Inject: #<Int: 0> Integer> Integer> #<Let: v9273 #<Var: tmp9270> #<Let: i9274 #<Var: tmp9271> #<If: #<If: #<Prim: eq? (#<Inject: #<Prim: not (#<Project: #<Let: tmp9275 #<Inject: #<Int: 0> Integer> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Var: tmp9275> Integer>)> Boolean>> Boolean>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<If: #<Prim: eq? (#<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean> #<Inject: #<Bool: #f> Boolean>)> #<Inject: #<Bool: #f> Boolean> #<Inject: #<Prim: < (#<Project: #<Var: i9274> Integer> #<Project: #<Inject: #<Prim: vector-length (#<Var: v9273>)> Integer> Integer>)> Boolean>>> #<Prim: vector-ref (#<Var: v9273> #<Var: i9274>)> #(struct:Exit)>>>>> Integer> #1#)}))
+encountered exception while testing 'r7`, case r7_16

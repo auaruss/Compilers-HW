@@ -1636,6 +1636,8 @@ Changelog:
   (or (pair? p) (mpair? p)))
 
 (define (lookup x ls [default no-default])
+  #;(AST-output-syntax 'abstract-syntax)
+  #;(printf "looking for ~a in ~a\n" x ls)
   (let recur ([xs ls])
     (cond
       [(null? xs)
