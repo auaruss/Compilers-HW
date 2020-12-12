@@ -121,8 +121,8 @@
      ("uniquify" ,uniquify ,interp-R7-prog)
      ("reveal functions" ,reveal-functions ,interp-R7-prog)
      ("cast insert" ,cast-insert ,interp-F3)
-     #;("check bounds" ,check-bounds ,interp-R6)
-     #;("reveal casts" ,reveal-casts ,interp-R6)
+     #;("check bounds" ,check-bounds ,interp-F3)
+     ("reveal casts" ,reveal-casts ,interp-F3)
      #;("convert to closures" ,convert-to-closures ,interp-F2)
      #;("limit functions" ,limit-functions ,interp-F2)
      #;("expose allocation" ,expose-allocation ,interp-F2)
@@ -151,6 +151,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" (tests-for "r7") #;(list "3") #;(filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
+(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" #;(tests-for "r7") #;(list "16") (filter (lambda (v) (not (or (equal? v "7") (equal? v "7")))) (tests-for "r7")))
 #;(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 

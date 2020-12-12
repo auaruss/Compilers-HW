@@ -7,6 +7,7 @@
 (require "interp-R5.rkt")
 (require "interp.rkt")
 (require "utilities.rkt")
+(require "type-check-R6.rkt")
 (provide (all-defined-out))
 (require racket/dict)
 (require racket/set)
@@ -504,7 +505,7 @@
       (ProgramDefs info revealed-definitions)])))
 
 
-;;Cast-Insert: R'7 -> R'6
+;;Cast-Insert : R'7 -> R'6
 (define new-op?
   (λ (op)
     (match op
@@ -514,19 +515,19 @@
       ['procedure? #t]
       ['void? #t]
       [else #f])))
-(define funref-helper
+(define any-helper
   (λ (n)
     (if (eqv? n 0)
         '()
-        (append '(Any) (funref-helper (sub1 n))))))
+        (append '(Any) (any-helper (sub1 n))))))
 
 (define cast-insert-exp
   (λ (e)
     (define recur cast-insert-exp)
     (match e
-      [(Void) (Inject (Void) 'void)]
+      [(Void) (Inject (Void) 'Void)]
       [(Var x) (Var x)]
-      [(FunRefArity label arity) (Inject (FunRefArity label arity) (append (funref-helper arity) '(-> Any)))]
+      [(FunRefArity label arity) (Inject (FunRefArity label arity) (append (any-helper arity) '(-> Any)))]
       [(Int n)
        (Inject (Int n) 'Integer)]
       [(Bool b)
@@ -550,13 +551,15 @@
        (Inject (Prim 'eq? (list (recur e1) (recur e2))) 'Boolean)]
       [(Prim 'not (list e1))
        (Inject (Prim 'not (list (Project (recur e1) 'Boolean))) 'Boolean)]
+      [(Prim 'vector-length (list e1))
+       (Inject (Prim 'vector-length (list (recur e1))) 'Integer)]
       [(Prim op (list e1))
        #:when (new-op? op)
        (Inject (Prim op (list (recur e1))) 'Boolean)]
       [(Prim 'vector es)
        (define es^ (for/list ([e es]) (recur e)))
        (Inject (Prim 'vector es^)
-               '(Vectorof Any))]
+               (append '(Vector) (any-helper (length es))))]
       [(Prim 'vector-ref (list e1 e2))
        (define tmp1 (gensym 'tmp))
        (define tmp2 (gensym 'tmp))
@@ -599,16 +602,254 @@
 
                                       (id 42)
                                       )))
+(define r7_7 (parse-program '(program () (define (hopefully-int) (lambda (x) (let ([maybe-int (read)])
+                                                                               (if (eq? maybe-int 42) x
+                                                                                   42))))
+                                      (define (hopefully-bool) (lambda (x) (and (not x) #t)))
+                                      (if (hopefully-bool) ((hopefully-int) 42)
+                                          (+ ((hopefully-int) 42) 0))
+                                      )))
 (define r7_12 (parse-program '(program () (let ([f (lambda (x) x)])
                                              (if (eq? f f)
                                                  (- 45 3)
                                                  777))
                                        )))
+(define r7_16 (parse-program '(program () (vector-ref (vector 42) 0)
+                                       )))
 (define r7_17 (parse-program '(program () (let ([x (if (eq? (read) 1) 0 #f)])
                                              (if (not x) 42 777))
                                        )))
 
-#;(cast-insert (reveal-functions (uniquify (shrink (type-check-R7 r7_12)))))
+
+;;Check-Bounds : R'6 -> R'6
+(define check-bounds-R6-class
+  (class type-check-R6-class
+    (super-new)
+    (inherit check-type-equal?)
+    (define/override (type-check-exp env)
+      (lambda (e)
+        (define recur (type-check-exp env))
+        (match e
+          [(Prim 'vector-ref (list e1 ei))
+           (define v (gensym 'v))
+           (define i (gensym 'i))
+           (define-values (e1^ e1-type) (recur e1))
+           (define-values (ei^ ei-type) ((type-check-exp (dict-set env v e1-type)) ei))
+           (match e1-type
+             [`(Vector ,ts ...)
+              (values
+               (Let v
+                    e1^
+                    (Let i
+                         ei^
+                         (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (Var i) (Prim 'vector-length (list (Var v))))))))
+                             (Prim 'vector-ref (list (Var v) (Var i)))
+                             (Exit))))
+               (list-ref ts (match ei
+                              [(Int n) n])))]
+             [`(Vectorof ,t)
+              (values
+               (Let v
+                    e1^
+                    (Let i
+                         ei^
+                         (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (list (Var i) (Prim 'vector-length (list (Var v)))))))))
+                             (Prim 'vector-ref (list (Var v) (Var i)))
+                             (Exit))))
+               t)])]
+          [(Prim 'vector-set! (list e-vec e-i e-arg))
+           (define v (gensym 'v))
+           (define i (gensym 'i))
+           (define-values (e-vec^ e-vec-type) (recur e-vec))
+           (define-values (e-i^ e-i-type) ((type-check-exp (dict-set env v e-vec-type)) e-i))
+           (define-values (e-arg^ e-arg-type) ((type-check-exp (dict-set (dict-set env v e-vec-type) i e-i-type)) e-arg))
+           (values
+            (Let v
+                 e-vec^
+                 (Let i
+                      e-i^
+                      (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (Var i) (Prim 'vector-length (list (Var v))))))))
+                          (Prim 'vector-set! (list (Var v) (Var i) e-arg^))
+                          (Exit))))
+            'Void)]
+          [else ((super type-check-exp env) e)])))
+    ))
+
+(define (check-bounds p)
+  (send (new check-bounds-R6-class) type-check-program p))
+
+
+#;(check-bounds (cast-insert (reveal-functions (uniquify (shrink (type-check-R7 r7_16))))))
+
+
+;;Reveal Casts : R'6 -> R'6
+(define tagof
+  (λ (ty)
+    (match ty
+      ['Integer 001]
+      ['Boolean 100]
+      [(cons 'Vector exps) 010]
+      [(cons 'Vectorof exps) 010]
+      [(cons x y) 011]
+      ['Void 101])))
+
+(define reveal-casts-exp
+  (λ (e)
+    (define recur reveal-casts-exp)
+    (match e
+      [(Void) (Void)]
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Bool b) (Bool b)]
+      [(Let x e body)
+       (Let x (recur e) (recur body))]
+      [(FunRefArity label arity) (FunRefArity label arity)]
+      [(Apply f arg*)
+       (Apply (recur f) (map recur arg*))]
+      [(Prim op (list e1))
+       #:when (new-op? op)
+       (define tmp (gensym 'tmp))
+       (match op
+         ['boolean?
+          (Let tmp
+               (recur e1)
+               (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                    (Int (tagof 'Boolean))))
+                   (Bool #t)
+                   (Bool #f)))]
+         ['integer?
+          (Let tmp
+               (recur e1)
+               (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                    (Int (tagof 'Integer))))
+                   (Bool #t)
+                   (Bool #f)))]
+         ['vector? (Let tmp
+               (recur e1)
+               (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                    (Int (tagof '(Vector dummy)))))
+                   (Bool #t)
+                   (Bool #f)))]
+         ['procedure? (Let tmp
+               (recur e1)
+               (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                    (Int (tagof '(dummy1 -> dummy2)))))
+                   (Bool #t)
+                   (Bool #f)))]
+         ['void? (Let tmp
+               (recur e1)
+               (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                    (Int (tagof 'Void))))
+                   (Bool #t)
+                   (Bool #f)))])
+       ]
+      [(Prim op es)
+       (Prim op (map recur es))]
+      [(If e1 e2 e3)
+       (If (recur e1) (recur e2) (recur e3))]
+      [(Lambda params rT body)
+       (Lambda params rT (recur body))]
+      [(Project e^ ftype)
+       (match ftype
+         [`(,ptypes ... -> ,rT)
+          (define e^^ (recur e^))
+          (match e^^
+            [(Prim 'make-any (list e1 e2))
+             (define tmp-make-any (gensym 'tmp))
+             (define tmp-other (gensym 'tmp))
+             (Let tmp-other
+               e1
+               (Let tmp-make-any
+                    (Prim 'make-any (list (Var tmp-other) e2))
+                    (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp-make-any)))
+                                             (Int (tagof ftype))))
+                            (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp-other)))
+                                             (Int (length ptypes))))
+                            (Bool #f))
+                        (ValueOf (Var tmp-make-any) ftype)
+                        (Exit))))]
+            [else
+             (define tmp (gensym 'tmp))
+             (Let tmp
+                    e^^
+                    (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                             (Int (tagof ftype))))
+                            (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp)))
+                                             (Int (length ptypes))))
+                            (Bool #f))
+                        (ValueOf (Var tmp) ftype)
+                        (Exit)))])]
+         [`(Vector ,exps ...)
+          (define e^^ (recur e^))
+          (match e^^
+            [(Prim 'make-any (list e1 e2))
+             (define tmp-make-any (gensym 'tmp))
+             (define tmp-other (gensym 'tmp))
+             (Let tmp-other
+                  e1
+                  (Let tmp-make-any
+                       (Prim 'make-any (list (Var tmp-other) e2))
+                       (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp-make-any)))
+                                                (Int (tagof ftype))))
+                               (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp-other)))
+                                                (Int (length exps))))
+                               (Bool #f))
+                           (ValueOf (Var tmp-make-any) ftype)
+                           (Exit))))]
+            [else
+             (define tmp (gensym 'tmp))
+             (Let tmp
+                  e^^
+                  (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                           (Int (tagof ftype))))
+                          (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp)))
+                                           (Int (length exps))))
+                          (Bool #f))
+                      (ValueOf (Var tmp) ftype)
+                      (Exit)))])]
+         #;[`(Vector ,exps ...)
+          (define tmp-make-any (gensym 'tmp))
+          (define tmp-other (gensym 'tmp))
+          (define e^^ (recur e^))
+          (define e^^^ (match e^^
+                         [(Prim 'make-any (list e1 e2)) e1]))
+          (define e^^-tag (match e^^
+                            [(Prim 'make-any (list e1 e2)) e1]))
+          (Let tmp-other
+               e^^^
+               (Let tmp-make-any
+                    (Prim 'make-any (list (Var tmp-other) e^^-tag))
+                    (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp-make-any)))
+                                             (Int (tagof ftype))))
+                            (Prim 'eq? (list (Prim 'vector-length (list (Var tmp-other)))
+                                             (Int (length exps))))
+                            (Bool #f))
+                        (ValueOf (Var tmp-make-any) ftype)
+                        (Exit))))]
+         [else
+          (define tmp (gensym 'tmp))
+          (Let tmp
+               (recur e^)
+               (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
+                                    (Int (tagof ftype))))
+                   (ValueOf (Var tmp) ftype)
+                   (Exit)))])]
+      [(Inject e^ ftype)
+       (Prim 'make-any (list (recur e^) (Int (tagof ftype))))])))
+
+(define reveal-casts 
+  (λ (p)
+    (match p
+      [(ProgramDefs info defns)
+       (define revealed-definitions
+          (for/list ([defn defns])
+            (match defn
+              [(Def label paramtypes returntype info e)
+               (Def label paramtypes returntype info (reveal-casts-exp e))])))
+      (ProgramDefs info revealed-definitions)])))
+
+
+#;(reveal-casts (check-bounds (cast-insert (reveal-functions (uniquify (shrink (type-check-R7 (parse-program '(program () 42)))))))))
 
 
 ;; Closure Conversion
