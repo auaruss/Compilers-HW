@@ -1,0 +1,376 @@
+type checker output: @ utilities.rkt:1757
+(strip-has-type tsexp):
+(ProgramDefsExp
+ '()
+ '()
+ (Let
+  'x
+  (Prim 'vector (list (Int 1) (Int 2) (Int 3) (Int 42)))
+  (Let
+   'voidy
+   (Prim 'vector-set! (list (Var 'x) (Int 1) (Int 7)))
+   (Let
+    'voidy
+    (Prim 'vector-set! (list (Var 'x) (Int 0) (Int 77)))
+    (Apply
+     (Lambda '(vec) 'Any (Prim 'vector-ref (list (Var 'vec) (Int 3))))
+     (list (Var 'x)))))))
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_4"
+
+expected-result:
+42
+
+
+running pass: shrink @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Let
+    'x
+    (Prim 'vector (list (Int 1) (Int 2) (Int 3) (Int 42)))
+    (Let
+     'voidy
+     (Prim 'vector-set! (list (Var 'x) (Int 1) (Int 7)))
+     (Let
+      'voidy
+      (Prim 'vector-set! (list (Var 'x) (Int 0) (Int 77)))
+      (Apply
+       (Lambda '(vec) 'Any (Prim 'vector-ref (list (Var 'vec) (Int 3))))
+       (list (Var 'x)))))))))
+
+
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_4"
+
+expected-result:
+42
+
+
+running pass: uniquify @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Let
+    'x9310
+    (Prim 'vector (list (Int 1) (Int 2) (Int 3) (Int 42)))
+    (Let
+     'voidy9311
+     (Prim 'vector-set! (list (Var 'x9310) (Int 1) (Int 7)))
+     (Let
+      'voidy9312
+      (Prim 'vector-set! (list (Var 'x9310) (Int 0) (Int 77)))
+      (Apply
+       (Lambda
+        '(vec9313)
+        'Any
+        (Prim 'vector-ref (list (Var 'vec9313) (Int 3))))
+       (list (Var 'x9310)))))))))
+
+
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_4"
+
+expected-result:
+42
+
+
+running pass: reveal functions @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Let
+    'x9310
+    (Prim 'vector (list (Int 1) (Int 2) (Int 3) (Int 42)))
+    (Let
+     'voidy9311
+     (Prim 'vector-set! (list (Var 'x9310) (Int 1) (Int 7)))
+     (Let
+      'voidy9312
+      (Prim 'vector-set! (list (Var 'x9310) (Int 0) (Int 77)))
+      (Apply
+       (Lambda
+        '(vec9313)
+        'Any
+        (Prim 'vector-ref (list (Var 'vec9313) (Int 3))))
+       (list (Var 'x9310)))))))))
+
+
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_4"
+
+expected-result:
+42
+
+
+running pass: cast insert @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Project
+    (Let
+     'x9310
+     (Inject
+      (Prim
+       'vector
+       (list
+        (Inject (Int 1) 'Integer)
+        (Inject (Int 2) 'Integer)
+        (Inject (Int 3) 'Integer)
+        (Inject (Int 42) 'Integer)))
+      '(Vector Any Any Any Any))
+     (Let
+      'voidy9311
+      (Let
+       'tmp9314
+       (Project (Var 'x9310) '(Vectorof Any))
+       (Let
+        'tmp9315
+        (Project (Inject (Int 1) 'Integer) 'Integer)
+        (Prim
+         'vector-set!
+         (list (Var 'tmp9314) (Var 'tmp9315) (Inject (Int 7) 'Integer)))))
+      (Let
+       'voidy9312
+       (Let
+        'tmp9316
+        (Project (Var 'x9310) '(Vectorof Any))
+        (Let
+         'tmp9317
+         (Project (Inject (Int 0) 'Integer) 'Integer)
+         (Prim
+          'vector-set!
+          (list (Var 'tmp9316) (Var 'tmp9317) (Inject (Int 77) 'Integer)))))
+       (Apply
+        (Project
+         (Inject
+          (Lambda
+           '((vec9313 : Any))
+           'Any
+           (Let
+            'tmp9318
+            (Project (Var 'vec9313) '(Vectorof Any))
+            (Let
+             'tmp9319
+             (Project (Inject (Int 3) 'Integer) 'Integer)
+             (Prim 'vector-ref (list (Var 'tmp9318) (Var 'tmp9319))))))
+          '(Any -> Any))
+         '(Any -> Any))
+        (list (Var 'x9310))))))
+    'Integer))))
+
+
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_4"
+
+expected-result:
+42
+
+
+running pass: reveal casts @ utilities.rkt:1785
+
+pass output:  @ utilities.rkt:1788
+(strip-has-type new-p^):
+(ProgramDefs
+ '()
+ (list
+  (Def
+   'main
+   '()
+   'Integer
+   '()
+   (Let
+    'tmp9321
+    (Let
+     'x9310
+     (Prim
+      'make-any
+      (list
+       (Prim
+        'vector
+        (list
+         (Prim 'make-any (list (Int 1) (Int 1)))
+         (Prim 'make-any (list (Int 2) (Int 1)))
+         (Prim 'make-any (list (Int 3) (Int 1)))
+         (Prim 'make-any (list (Int 42) (Int 1)))))
+       (Int 10)))
+     (Let
+      'voidy9311
+      (Let
+       'tmp9314
+       (Let
+        'tmp9322
+        (Var 'x9310)
+        (If
+         (Prim 'eq? (list (Prim 'tag-of-any (list (Var 'tmp9322))) (Int 10)))
+         (ValueOf (Var 'tmp9322) '(Vectorof Any))
+         (Exit)))
+       (Let
+        'tmp9315
+        (Let
+         'tmp9323
+         (Prim 'make-any (list (Int 1) (Int 1)))
+         (If
+          (Prim 'eq? (list (Prim 'tag-of-any (list (Var 'tmp9323))) (Int 1)))
+          (ValueOf (Var 'tmp9323) 'Integer)
+          (Exit)))
+        (Prim
+         'vector-set!
+         (list
+          (Var 'tmp9314)
+          (Var 'tmp9315)
+          (Prim 'make-any (list (Int 7) (Int 1)))))))
+      (Let
+       'voidy9312
+       (Let
+        'tmp9316
+        (Let
+         'tmp9324
+         (Var 'x9310)
+         (If
+          (Prim 'eq? (list (Prim 'tag-of-any (list (Var 'tmp9324))) (Int 10)))
+          (ValueOf (Var 'tmp9324) '(Vectorof Any))
+          (Exit)))
+        (Let
+         'tmp9317
+         (Let
+          'tmp9325
+          (Prim 'make-any (list (Int 0) (Int 1)))
+          (If
+           (Prim 'eq? (list (Prim 'tag-of-any (list (Var 'tmp9325))) (Int 1)))
+           (ValueOf (Var 'tmp9325) 'Integer)
+           (Exit)))
+         (Prim
+          'vector-set!
+          (list
+           (Var 'tmp9316)
+           (Var 'tmp9317)
+           (Prim 'make-any (list (Int 77) (Int 1)))))))
+       (Apply
+        (Let
+         'tmp9328
+         (Prim
+          'make-any
+          (list
+           (Lambda
+            '((vec9313 : Any))
+            'Any
+            (Let
+             'tmp9318
+             (Let
+              'tmp9326
+              (Var 'vec9313)
+              (If
+               (Prim
+                'eq?
+                (list (Prim 'tag-of-any (list (Var 'tmp9326))) (Int 10)))
+               (ValueOf (Var 'tmp9326) '(Vectorof Any))
+               (Exit)))
+             (Let
+              'tmp9319
+              (Let
+               'tmp9327
+               (Prim 'make-any (list (Int 3) (Int 1)))
+               (If
+                (Prim
+                 'eq?
+                 (list (Prim 'tag-of-any (list (Var 'tmp9327))) (Int 1)))
+                (ValueOf (Var 'tmp9327) 'Integer)
+                (Exit)))
+              (Prim 'vector-ref (list (Var 'tmp9318) (Var 'tmp9319))))))
+           (Int 11)))
+         (If
+          (If
+           (Prim 'eq? (list (Prim 'tag-of-any (list (Var 'tmp9328))) (Int 11)))
+           (Prim
+            'eq?
+            (list
+             (Prim
+              'procedure-arity
+              (list (ValueOf (Var 'tmp9328) '(Any -> Any))))
+             (Int 1)))
+           (Bool #f))
+          (ValueOf (Var 'tmp9328) '(Any -> Any))
+          (Exit)))
+        (list (Var 'x9310))))))
+    (If
+     (Prim 'eq? (list (Prim 'tag-of-any (list (Var 'tmp9321))) (Int 1)))
+     (ValueOf (Var 'tmp9321) 'Integer)
+     (Exit))))))
+
+
+output:  @ utilities.rkt:1799
+result:
+42
+
+
+testing @ utilities.rkt:1774
+test-name:
+"r7_4"
+
+expected-result:
+42
+
+
+running pass: convert to closures @ utilities.rkt:1785
+
+encountered exception while testing 'r7`, case r7_4
