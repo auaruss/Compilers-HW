@@ -753,79 +753,28 @@
        (match ftype
          [`(,ptypes ... -> ,rT)
           (define e^^ (recur e^))
-          (match e^^
-            [(Prim 'make-any (list e1 e2))
-             (define tmp-make-any (gensym 'tmp))
-             (define tmp-other (gensym 'tmp))
-             (Let tmp-other
-               e1
-               (Let tmp-make-any
-                    (Prim 'make-any (list (Var tmp-other) e2))
-                    (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp-make-any)))
-                                             (Int (tagof ftype))))
-                            (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp-other)))
-                                             (Int (length ptypes))))
-                            (Bool #f))
-                        (ValueOf (Var tmp-make-any) ftype)
-                        (Exit))))]
-            [else
-             (define tmp (gensym 'tmp))
+          (define tmp (gensym 'tmp))
              (Let tmp
                     e^^
                     (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
                                              (Int (tagof ftype))))
-                            (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp)))
+                            (Prim 'eq? (list (Prim 'procedure-arity (list (ValueOf (Var tmp) ftype)))
                                              (Int (length ptypes))))
                             (Bool #f))
                         (ValueOf (Var tmp) ftype)
-                        (Exit)))])]
+                        (Exit)))]
          [`(Vector ,exps ...)
           (define e^^ (recur e^))
-          (match e^^
-            [(Prim 'make-any (list e1 e2))
-             (define tmp-make-any (gensym 'tmp))
-             (define tmp-other (gensym 'tmp))
-             (Let tmp-other
-                  e1
-                  (Let tmp-make-any
-                       (Prim 'make-any (list (Var tmp-other) e2))
-                       (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp-make-any)))
-                                                (Int (tagof ftype))))
-                               (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp-other)))
-                                                (Int (length exps))))
-                               (Bool #f))
-                           (ValueOf (Var tmp-make-any) ftype)
-                           (Exit))))]
-            [else
-             (define tmp (gensym 'tmp))
+          (define tmp (gensym 'tmp))
              (Let tmp
                   e^^
                   (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp)))
                                            (Int (tagof ftype))))
-                          (Prim 'eq? (list (Prim 'procedure-arity (list (Var tmp)))
+                          (Prim 'eq? (list (Prim 'procedure-arity (list (ValueOf (Var tmp) ftype)))
                                            (Int (length exps))))
                           (Bool #f))
                       (ValueOf (Var tmp) ftype)
-                      (Exit)))])]
-         #;[`(Vector ,exps ...)
-          (define tmp-make-any (gensym 'tmp))
-          (define tmp-other (gensym 'tmp))
-          (define e^^ (recur e^))
-          (define e^^^ (match e^^
-                         [(Prim 'make-any (list e1 e2)) e1]))
-          (define e^^-tag (match e^^
-                            [(Prim 'make-any (list e1 e2)) e1]))
-          (Let tmp-other
-               e^^^
-               (Let tmp-make-any
-                    (Prim 'make-any (list (Var tmp-other) e^^-tag))
-                    (If (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var tmp-make-any)))
-                                             (Int (tagof ftype))))
-                            (Prim 'eq? (list (Prim 'vector-length (list (Var tmp-other)))
-                                             (Int (length exps))))
-                            (Bool #f))
-                        (ValueOf (Var tmp-make-any) ftype)
-                        (Exit))))]
+                      (Exit)))]
          [else
           (define tmp (gensym 'tmp))
           (Let tmp

@@ -151,6 +151,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" #;(tests-for "r7") #;(list "16") (filter (lambda (v) (not (or (equal? v "7") (equal? v "7")))) (tests-for "r7")))
+(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" (tests-for "r7") #;(list "16") #;(filter (lambda (v) (not (or (equal? v "7") (equal? v "7")))) (tests-for "r7")))
 #;(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 
