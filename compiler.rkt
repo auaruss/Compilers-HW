@@ -1552,6 +1552,30 @@
      (if (atm? e)
          (list (Instr 'movq (list (sel-ins-atm e) v)))
          (match e
+           [(Prim 'make-any (list e (Int tag)))
+            (if (or (= tag 1)
+                    (= tag 4))
+                (list (Instr 'movq (list (sel-ins-atm e) v))
+                      (Instr 'salq (list (Imm 3) v))
+                      (Instr 'orq (list (Imm tag) v)))
+                (list (Instr 'movq (list (sel-ins-atm e) v))
+                      (Instr 'orq (list (Imm tag) v))))]
+           [(Prim 'tag-of-any (list e))
+            (list (Instr 'movq (list (sel-ins-atm e) v))
+                  (Instr 'andq (list (Imm 7) v)))]
+           [(ValueOf e ty)
+            (if (or (eq? ty 'Integer)
+                    (eq? ty 'Boolean))
+                (list (Instr 'movq (list (sel-ins-atm e) v)) 
+                      (Instr 'sarq (list (Imm 3) v)))
+                (list (Instr 'movq (list (Imm -8) v))
+                      (Instr 'andq (list (sel-ins-atm e) v))))] 
+           [(Prim 'vector-length (list e))
+            (list (Instr 'movq (list (sel-ins-atm e) (Reg 'r11))) 
+                  (Instr 'movq (list (Deref 'r11 0) (Reg 'r11)))
+                  (Instr 'andq (list (Imm 126) (Reg 'r11)))
+                  (Instr 'sarq (list (Imm 1) (Reg 'r11)))
+                  (Instr 'movq (list (Reg 'r11) v)))]
            [(FunRef lbl) (list (Instr 'leaq (list (FunRef lbl) v)))] ;; think this is right
            [(Call fun args) (append (assign-arg-regs args 0)
                                     (list (IndirectCallq (sel-ins-atm fun) (length args)) 
@@ -1572,10 +1596,18 @@
            [(Prim 'procedure-arity (list f)) (list (Instr 'movq (list (sel-ins-atm f) (Reg 'r11)))
                                                    (Instr 'movq (list (Deref 'r11 0) v))
                                                    (Instr 'sarq (list (Imm 57) v)))]
-           [(Prim 'vector-ref (list atm (HasType (Int n) t)))
+           [(Prim 'vector-ref (list vec ind-exp))
+            (list (Instr 'movq (list (sel-ins-atm ind-exp) (Reg 'r11)))
+                  (Instr 'addq (list (Imm 1) (Reg 'r11)))
+                  (Instr 'imulq (list (Imm 8) (Reg 'r11)))
+                  (Instr 'addq (list (sel-ins-atm vec) (Reg 'r11)))
+                  (Instr 'movq (list (Deref 'r11 0) v)))]
+           #;[(Prim 'vector-ref (list atm (HasType (Int n) t)))
             (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) 
                   (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]
-           [(Prim 'vector-set! (list atm1 (HasType (Int n) t) atm2))
+           [(Prim 'vector-set! (list atm1 ind-exp atm2))
+            'fix-this]
+           #;[(Prim 'vector-set! (list atm1 (HasType (Int n) t) atm2))
             (list (Instr 'movq (list (sel-ins-atm atm1) (Reg 'r11)))
                   (Instr 'movq (list (sel-ins-atm atm2) (Deref 'r11 (* 8 (add1 n)))))
                   (Instr 'movq (list (Imm 0) v)))]
@@ -1625,6 +1657,8 @@
 
 (define (sel-ins-tail c0t name)
   (match c0t
+    [(Exit) (list (Instr 'movq (list (Imm -1) (Reg 'rdi)))
+                  (Callq 'exit 0))]
     [(TailCall fun args) (append (assign-arg-regs args 0)
                                  (list (TailJmp (sel-ins-atm fun) (length args))))]
     [(HasType tail type) (sel-ins-tail tail name)]
