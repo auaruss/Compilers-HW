@@ -1268,49 +1268,59 @@
      (define new-rhs (rco-exp rhs))
      (define-values (new-body body-ss) (rco-atom body))
      (values new-body (append `((,x . ,new-rhs)) body-ss))]
-    [(HasType (Prim op es) t)
+    [(Prim op es)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (define ss (append* sss))
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) t)
-             (append ss `((,tmp . ,(HasType (Prim op new-es) t)))))]
-    [(HasType (If e1 e2 e3) t)
+     (values (Var tmp)
+             (append ss `((,tmp . ,(Prim op new-es)))))]
+    [(If e1 e2 e3)
      (define new-es
        (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
      (define tmp (gensym 'tmp))
      (match new-es
 	    [(list e1 e2 e3)
-	     (values (HasType (Var tmp) t)
-             `((,tmp . ,(HasType (If e1 e2 e3) t))))])]
-    [(HasType (Collect n) t)
+	     (values (Var tmp)
+             `((,tmp . ,(If e1 e2 e3))))])]
+    [(Collect n)
      (define tmp (gensym 'tmp))
-     (values (HasType (Void) t)
-             `((,tmp . ,(HasType (Collect n) t))))]
-    [(HasType (GlobalValue name) t) 
+     (values (Void)
+             `((,tmp . ,(Collect n))))]
+    [(GlobalValue name) 
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) t)
-             `((,tmp . ,(HasType (GlobalValue name) t))))]
-    [(HasType (Allocate n t) ty)
+     (values (Var tmp)
+             `((,tmp . ,(GlobalValue name))))]
+    [(Allocate n t)
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) ty)
-             `((,tmp . ,(HasType (Allocate n t) ty))))]
-    [(HasType (AllocateClosure n t ar) ty)
+     (values (Var tmp)
+             `((,tmp . ,(Allocate n t))))]
+    [(AllocateClosure n t ar)
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) ty)
-             `((,tmp . ,(HasType (AllocateClosure n t ar) ty))))]
-    [(HasType (FunRef name) t)
+     (values (Var tmp)
+             `((,tmp . ,(AllocateClosure n t ar))))]
+    [(FunRef name)
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) t)
-             `((,tmp . ,(HasType (FunRef name) t))))]
-    [(HasType (Apply f es) t)
+     (values (Var tmp)
+             `((,tmp . ,(FunRef name))))]
+    [(Exit)
+     (define tmp (gensym 'tmp))
+     (values (Var tmp)
+             `((,tmp . ,(Exit))))]
+    [(ValueOf e ftype)
+     (define-values (e^ ss)
+       (rco-atom e))
+     (define tmp (gensym 'tmp))
+     (values (Var tmp)
+             (append ss `((,tmp . ,(ValueOf e^ ftype)))))]
+    [(Apply f es)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (define-values (new-f ssf) (rco-atom f))
      (define ss (append* ssf sss))
      (define tmp (gensym 'tmp))
-     (values (HasType (Var tmp) t)
-             (append ss `((,tmp . ,(HasType (Apply new-f new-es) t)))))]
+     (values (Var tmp)
+             (append ss `((,tmp . ,(Apply new-f new-es)))))]
     [(HasType e t)
      (define-values (new-e ss) (rco-atom e))
      (values (HasType new-e t) ss)]
@@ -1329,18 +1339,23 @@
     [(Var x) (Var x)]
     [(Int n) (Int n)]
     [(Bool b) (Bool b)]
+    [(Exit) (Exit)]
     [(FunRef x) (FunRef x)]
     [(Let x rhs body)
      (Let x (rco-exp rhs) (rco-exp body))]
-    [(HasType (Prim op es) t)
+    [(Prim op es)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
-     (make-lets^ (append* sss) (HasType (Prim op new-es) t))]
-    [(HasType (Apply f es) t)
+     (make-lets^ (append* sss) (Prim op new-es))]
+    [(ValueOf e ftype)
+     (define-values (e^ ss)
+       (rco-atom e))
+     (make-lets^ ss (ValueOf e^ ftype))]
+    [(Apply f es)
      (define-values (new-es sss)
        (for/lists (l1 l2) ([e es]) (rco-atom e)))
      (define-values (new-f f-ss) (rco-atom f))
-     (make-lets^ (append (append* sss) f-ss) (HasType (Apply new-f new-es) t))]
+     (make-lets^ (append (append* sss) f-ss) (Apply new-f new-es))]
     [(If e1 e2 e3)
      (define new-es
        (for/list ([e (list e1 e2 e3)]) (rco-exp e)))
@@ -1355,20 +1370,14 @@
      (HasType (rco-exp e) t)]
     ))
 
-(define r4p25 (parse-program `(program '() (define (id [x : Integer]) : Integer x)
 
-(define (f [v : (Vector (Integer -> Integer))]) : (Integer -> Integer)
-  (vector-ref v 0))
 
-((f (vector id)) 42)
-)))
-
-#;(remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 r4p02)))))))
-
-; explicate-tail : R4 -> C3Tail x [Var]
-; takes in R4 expression and produces C3 Tail and list of let-bound variables
-(define (explicate-tail r4exp funlabel)
-  (match r4exp
+; explicate-tail : R'6 -> C5Tail x [Var]
+; takes in R'6 expression and produces C5 Tail and list of let-bound variables
+(define (explicate-tail e funlabel)
+  (match e
+    [(Exit)
+     (values (Exit) '())]
     [(Int n)
      (values (Return (Int n)) '())]
     [(Bool b)
@@ -1377,6 +1386,8 @@
      (values (Return (FunRef l)) '())]
     [(Prim 'read '())
      (values (Return (Prim 'read '())) '())]
+    [(ValueOf e ftype)
+     (values (Return (ValueOf e ftype)) '())]
     [(Prim op ls)
      (values (Return (Prim op ls)) '())]
     [(Apply f es)
@@ -1405,8 +1416,10 @@
 
 ;; simplify
 
-(define (explicate-assign r4exp v c funlabel)
-  (match r4exp
+(define (explicate-assign e v c funlabel)
+  (match e
+    [(Exit)
+     (values (Seq (Assign v (Exit)) c) '())]
     [(Void)
      (values (Seq (Assign v (Void)) c) '())]
     [(Collect n)
@@ -1425,6 +1438,9 @@
      (values (Seq (Assign v (FunRef l)) c) '())]
     [(Prim op ls)
      (values (Seq (Assign v (Prim op ls)) c)
+             '())]
+    [(ValueOf e ftype)
+     (values (Seq (Assign v (ValueOf e ftype)) c)
              '())]
     [(Apply f es)
      (values (Seq (Assign v (Call f es)) c)
@@ -1457,8 +1473,8 @@
     ))
 
 ;; explicate-pred : R4_exp x C3_tail x C3_tail -> C3_tail x var list
-(define (explicate-pred r4exp c1 c2 funlabel)
-  (match r4exp
+(define (explicate-pred e c1 c2 funlabel)
+  (match e
     [(Bool b)
      (values (if b c1 c2) '())]
     [(Var v)
@@ -1472,7 +1488,7 @@
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
      (function-label-set! label2 funlabel)
-     (values (IfStmt (Prim 'eq? (list r4exp (Bool #t))) (Goto label1) (Goto label2))
+     (values (IfStmt (Prim 'eq? (list e (Bool #t))) (Goto label1) (Goto label2))
              '())]
     [(Prim op ls)
      (define label1 (gensym 'block))
@@ -1485,7 +1501,20 @@
      (instructions-set! label2 c2)
      (live-before-set-set! label2 (list->set '()))
      (function-label-set! label2 funlabel)
-     (values (IfStmt r4exp (Goto label1) (Goto label2))
+     (values (IfStmt e (Goto label1) (Goto label2))
+             '())]
+    [(ValueOf e^ ftype)
+     (define label1 (gensym 'block))
+     (define label2 (gensym 'block))
+     (add-vertex! globalCFG label1)
+     (instructions-set! label1 c1)
+     (live-before-set-set! label1 (list->set '()))
+     (function-label-set! label1 funlabel)
+     (add-vertex! globalCFG label2)
+     (instructions-set! label2 c2)
+     (live-before-set-set! label2 (list->set '()))
+     (function-label-set! label2 funlabel)
+     (values (IfStmt e (Goto label1) (Goto label2))
              '())]
     [(Apply f es)
      (define label1 (gensym 'block))
@@ -1545,7 +1574,7 @@
                                           ])))
      (ProgramDefs (cons (cons 'locals localvars) info) new-ds)]))
 
-#;(explicate-control (remove-complex-opera* (expose-allocation (limit-functions (convert-to-closures (reveal-functions (uniquify (shrink (type-check-R5 r5_13)))))))))
+
 
 
 ;;uncover-locals-helper : C3 list of blocks -> association list of locals and their types
