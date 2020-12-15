@@ -1638,6 +1638,9 @@ Changelog:
 (define (lookup x ls [default no-default])
   #;(AST-output-syntax 'abstract-syntax)
   #;(printf "looking for ~a in ~a\n" x ls)
+  #;(printf "~a ~a\n" (symbol? x) (for/list ([l ls]) (if (pair? l)
+						       (cons (car l) (symbol? (car l)))
+						       '())))
   (let recur ([xs ls])
     (cond
       [(null? xs)

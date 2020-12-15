@@ -20,7 +20,7 @@
 (require "interp.rkt")
 (require "compiler.rkt")
 (AST-output-syntax 'abstract-syntax)
-(debug-level 3)
+(debug-level 0)
 ;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
@@ -129,7 +129,7 @@
      ("remove complex opera*" ,remove-complex-opera* ,interp-F3)
      ("explicate control" ,explicate-control ,interp-C5)
      ("instruction selection" ,select-instructions ,interp-pseudo-x86-4)
-     #;("uncover live" ,uncover-live ,interp-pseudo-x86-3)
+     ("uncover live" ,uncover-live ,interp-pseudo-x86-4)
      #;("build interference" ,build-interference ,interp-pseudo-x86-3)
      #;("allocate registers" ,allocate-registers ,interp-x86-3)
      #;("patch instructions" ,patch-instructions ,interp-x86-3)

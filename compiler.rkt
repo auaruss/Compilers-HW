@@ -634,7 +634,7 @@
            (define v (gensym 'v))
            (define i (gensym 'i))
            (define-values (e1^ e1-type) (recur e1))
-           (define-values (ei^ ei-type) ((type-check-exp (dict-set env v e1-type)) ei))
+           (define-values (ei^ ei-type) ((type-check-exp env #;(dict-set env v e1-type)) ei))
            (match e1-type
              [`(Vector ,ts ...)
               (values
@@ -642,7 +642,7 @@
                     e1^
                     (Let i
                          ei^
-                         (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (Var i) (Prim 'vector-length (list (Var v))))))))
+                         (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (list (Var i) (Prim 'vector-length (list (Var v)))))))))
                              (Prim 'vector-ref (list (Var v) (Var i)))
                              (Exit))))
                (list-ref ts (match ei
@@ -661,17 +661,19 @@
            (define v (gensym 'v))
            (define i (gensym 'i))
            (define-values (e-vec^ e-vec-type) (recur e-vec))
-           (define-values (e-i^ e-i-type) ((type-check-exp (dict-set env v e-vec-type)) e-i))
-           (define-values (e-arg^ e-arg-type) ((type-check-exp (dict-set (dict-set env v e-vec-type) i e-i-type)) e-arg))
+           (define-values (e-i^ e-i-type) ((type-check-exp env #;(dict-set env v e-vec-type)) e-i))
+           (define-values (e-arg^ e-arg-type) ((type-check-exp env #;(dict-set (dict-set env v e-vec-type) i e-i-type)) e-arg))
            (values
             (Let v
                  e-vec^
                  (Let i
                       e-i^
-                      (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (Var i) (Prim 'vector-length (list (Var v))))))))
+                      (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (list (Var i) (Prim 'vector-length (list (Var v)))))))))
                           (Prim 'vector-set! (list (Var v) (Var i) e-arg^))
                           (Exit))))
             'Void)]
+          [(Prim 'vector args)
+           (values (Prim 'vector args) (cons 'Vector (for/list ([arg args]) 'Any)))]
           [else ((super type-check-exp env) e)])))
     ))
 
@@ -686,12 +688,12 @@
 (define tagof
   (λ (ty)
     (match ty
-      ['Integer 001]
-      ['Boolean 100]
-      [(cons 'Vector exps) 010]
-      [(cons 'Vectorof exps) 010]
-      [(cons x y) 011]
-      ['Void 101])))
+      ['Integer 1]
+      ['Boolean 4]
+      [(cons 'Vector exps) 2]
+      [(cons 'Vectorof exps) 2]
+      [(cons x y) 3]
+      ['Void 5])))
 
 (define reveal-casts-exp
   (λ (e)
