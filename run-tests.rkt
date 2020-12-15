@@ -20,7 +20,7 @@
 (require "interp.rkt")
 (require "compiler.rkt")
 (AST-output-syntax 'abstract-syntax)
-(debug-level 0)
+(debug-level 3)
 ;; (AST-output-syntax 'concrete-syntax)
 
 ;; Define the passes to be used by interp-tests and the grader
@@ -128,7 +128,7 @@
      ("expose allocation" ,expose-allocation ,interp-F3)
      ("remove complex opera*" ,remove-complex-opera* ,interp-F3)
      ("explicate control" ,explicate-control ,interp-C5)
-     #;("instruction selection" ,select-instructions ,interp-pseudo-x86-3)
+     ("instruction selection" ,select-instructions ,interp-pseudo-x86-4)
      #;("uncover live" ,uncover-live ,interp-pseudo-x86-3)
      #;("build interference" ,build-interference ,interp-pseudo-x86-3)
      #;("allocate registers" ,allocate-registers ,interp-x86-3)
@@ -150,6 +150,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" (tests-for "r7") #;(list "4") #;(filter (lambda (v) (not (or (equal? v "7") (equal? v "7")))) (tests-for "r7")))
+(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" #;(tests-for "r7") (list "16") #;(filter (lambda (v) (not (or (equal? v "7") (equal? v "7")))) (tests-for "r7")))
 #;(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 

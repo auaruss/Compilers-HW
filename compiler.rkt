@@ -1123,12 +1123,15 @@
                     (foldl
                      (λ (elem acc)
                        (let* ([x (string->symbol (string-append "x" (number->string i)))]
-                              #;[xtype (match type
+                              [xtype (match type
                                          [`(Vector ((Vector _) ,ts ... -> ,rt))
                                           #;(unless (and (exact-nonnegative-integer? i) (< i (add1 (length ts))))
                                               (error 'expose-allocation-exp "invalid index ~a exps:~a type: ~a" i exps type))
                                           #;(list-ref (cons '(Vector _) (append ts (list rt))) i)
-                                          (match (list-ref exps i)
+                                          (if (eqv? i 0)
+                                              '(Vector _)
+                                              'Any)
+                                          #;(match (list-ref exps i)
                                             [(HasType exp^ t^) t^])]
                                          [`(Vector ,ts ...)
                                           (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
@@ -1228,17 +1231,17 @@
        (Prim 'vector-ref (list (recur e^) int))]
       [(Prim 'vector-set! (list exp1 int exp2))
        (Prim 'vector-set! (list (recur exp1) int (recur exp2)))]
+      [(Prim 'vector exps)
+       (expose-allocation-vec recur exps (cons 'Vector (for/list ([e exps]) 'Any)) #f)]
       [(Prim op es)
        (Prim op (map recur es))]
       [(If e1 e2 e3)
        (If (recur e1) (recur e2) (recur e3))]
       [(Apply f arg*) (Apply (recur f) (map recur arg*))]
-      [(Prim 'vector exps)
-       (expose-allocation-vec recur exps 'Any #f)]
       #;[(HasType (Prim 'vector exps) type)
        (expose-allocation-vec recur exps type #f)]
       [(Closure arity exps)
-       (expose-allocation-vec recur exps 'Any arity)]
+       (expose-allocation-vec recur exps `(Vector ,(append '((Vector _)) (cdr (for/list ([e exps]) 'Any)) '(-> Any))) arity)]
       #;[(HasType (Closure arity exps) type)
        (expose-allocation-vec recur exps type arity)]
       [(ValueOf e ftype)
@@ -1419,7 +1422,8 @@
 (define (explicate-assign e v c funlabel)
   (match e
     [(Exit)
-     (values (Seq (Assign v (Exit)) c) '())]
+     (values (Exit) '())
+     #;(values (Seq (Assign v (Exit)) c) '())]
     [(Void)
      (values (Seq (Assign v (Void)) c) '())]
     [(Collect n)
@@ -1634,7 +1638,9 @@
     [(Bool b) 
      (match b
       [#t (Imm 1)]
-      [#f (Imm 0)])]))
+      [#f (Imm 0)])]
+    [(Void)
+     (Imm 0)]))
 
 ; sel-ins-stmt : C0stmt -> pseudo-x86
 ; takes in a c0 statement and converts to pseudo-x86
@@ -1734,7 +1740,7 @@
                   (Instr 'andq (list (Imm 126) (Reg 'r11)))
                   (Instr 'sarq (list (Imm 1) (Reg 'r11)))
                   (Instr 'movq (list (Reg 'r11) v)))]
-           [(FunRef lbl) (list (Instr 'leaq (list (FunRef lbl) v)))] ;; think this is right
+           [(FunRef lbl) (list (Instr 'leaq (list (FunRef lbl) v)))]
            [(Call fun args) (append (assign-arg-regs args 0)
                                     (list (IndirectCallq (sel-ins-atm fun) (length args)) 
                                           (Instr 'movq (list (Reg 'rax) v))))]
@@ -1764,7 +1770,12 @@
             (list (Instr 'movq (list (sel-ins-atm atm) (Reg 'r11))) 
                   (Instr 'movq (list (Deref 'r11 (* 8 (add1 n))) v)))]
            [(Prim 'vector-set! (list atm1 ind-exp atm2))
-            'fix-this]
+            (list (Instr 'movq (list (sel-ins-atm ind-exp) (Reg 'r11)))
+                  (Instr 'addq (list (Imm 1) (Reg 'r11)))
+                  (Instr 'imulq (list (Imm 8) (Reg 'r11)))
+                  (Instr 'addq (list (sel-ins-atm atm1) (Reg 'r11)))
+                  (Instr 'movq (list (sel-ins-atm atm2) (Deref 'r11 0)))
+                  (Instr 'movq (list (Imm 0) v)))]
            #;[(Prim 'vector-set! (list atm1 (HasType (Int n) t) atm2))
             (list (Instr 'movq (list (sel-ins-atm atm1) (Reg 'r11)))
                   (Instr 'movq (list (sel-ins-atm atm2) (Deref 'r11 (* 8 (add1 n)))))
@@ -1830,7 +1841,17 @@
      (append x86stmt x86tail)]
     [(Goto label)
      (list (Jmp label)) ]
-    [(IfStmt (Prim 'vector-ref (list v (HasType (Int i) 'Integer))) (Goto label1) (Goto label2))
+    [(IfStmt (Prim 'vector-ref (list v ind-exp)) (Goto label1) (Goto label2))
+     (let ([v_ (sel-ins-atm v)])
+       (list
+        (Instr 'movq (list (sel-ins-atm ind-exp) (Reg 'r11)))
+        (Instr 'addq (list (Imm 1) (Reg 'r11)))
+        (Instr 'imulq (list (Imm 8) (Reg 'r11)))
+        (Instr 'addq (list v_ (Reg 'r11)))
+        (Instr 'cmpq (list (Imm 1) (Deref 'r11 0)))
+        (JmpIf 'e label1)
+        (Jmp label2)))]
+    #;[(IfStmt (Prim 'vector-ref (list v (HasType (Int i) 'Integer))) (Goto label1) (Goto label2))
      (let ([v_ (sel-ins-atm v)])
        (list
 	(Instr 'movq (list v_ (Reg 'r11)))
@@ -1873,15 +1894,7 @@
      (ProgramDefs info new-ds)]))
 
 
-(define jeremytest (parse-program `(program '() (define (tail-sum  [n : Integer] [r : Integer]) : Integer
-   (if (eq? n 0)
-      r
-      (tail-sum (- n 1) (+ n r))
-   )
-)
-(+ (tail-sum 5 0) 27))))
-
-#;(select-instructions (uncover-locals (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-functions (uniquify (shrink (type-check-R4 jeremytest))))))))))
+#;(select-instructions (explicate-control (remove-complex-opera* (expose-allocation (limit-functions (reveal-casts (cast-insert (reveal-functions (uniquify (shrink (type-check-R7 r7_16)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  Assignment 2 Work (Replaces assign-homes)    ;;;;
