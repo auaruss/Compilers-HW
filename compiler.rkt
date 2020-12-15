@@ -677,8 +677,84 @@
           [else ((super type-check-exp env) e)])))
     ))
 
-(define (check-bounds p)
+#;(define (check-bounds p)
   (send (new check-bounds-R6-class) type-check-program p))
+
+(define (check-bounds-exp e)
+  (define recur check-bounds-exp)
+  (match e
+    [(Void) (Void)]
+      [(Var x) (Var x)]
+      [(Int n) (Int n)]
+      [(Bool b) (Bool b)]
+      [(Let x e body)
+       (Let x (recur e) (recur body))]
+      [(FunRefArity label arity) (FunRefArity label arity)]
+      [(Apply f arg*)
+       (Apply (recur f) (map recur arg*))]
+      [(Prim op es)
+       (Prim op (map recur es))]
+      [(If e1 e2 e3)
+       (If (recur e1) (recur e2) (recur e3))]
+      [(Lambda params rT body)
+       (Lambda params rT (recur body))]
+      [(Project e^ ftype)
+       (Project (recur e^) ftype)]
+      [(Inject e^ ftype)
+       (Inject (recur e^) ftype)]
+    [(Prim 'vector-ref (list e1 ei))
+           (define v (gensym 'v))
+           (define i (gensym 'i))
+           (define-values (e1^ e1-type) (recur e1))
+           (define-values (ei^ ei-type) (recur ei))
+           (match e1-type
+             [`(Vector ,ts ...)
+              (values
+               (Let v
+                    e1^
+                    (Let i
+                         ei^
+                         (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (list (Var i) (Prim 'vector-length (list (Var v)))))))))
+                             (Prim 'vector-ref (list (Var v) (Var i)))
+                             (Exit))))
+               (list-ref ts (match ei
+                              [(Int n) n])))]
+             [`(Vectorof ,t)
+              (values
+               (Let v
+                    e1^
+                    (Let i
+                         ei^
+                         (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (list (Var i) (Prim 'vector-length (list (Var v)))))))))
+                             (Prim 'vector-ref (list (Var v) (Var i)))
+                             (Exit))))
+               t)])]
+          [(Prim 'vector-set! (list e-vec e-i e-arg))
+           (define v (gensym 'v))
+           (define i (gensym 'i))
+           (define-values (e-vec^ e-vec-type) (recur e-vec))
+           (define-values (e-i^ e-i-type) (recur e-i))
+           (define-values (e-arg^ e-arg-type) (recur e-arg))
+           (values
+            (Let v
+                 e-vec^
+                 (Let i
+                      e-i^
+                      (If (cast-insert-exp (shrink-exp (Prim 'and (list (Prim '<= (list (Int 0) (Var i))) (Prim '< (list (Var i) (Prim 'vector-length (list (Var v)))))))))
+                          (Prim 'vector-set! (list (Var v) (Var i) e-arg^))
+                          (Exit))))
+            'Void)]))
+
+(define check-bounds
+  (λ (p)
+    (match p
+      [(ProgramDefs info defns)
+       (define checked-definitions
+          (for/list ([defn defns])
+            (match defn
+              [(Def label paramtypes returntype info e)
+               (Def label paramtypes returntype info (check-bounds-exp e))])))
+      (ProgramDefs info checked-definitions)])))
 
 
 #;(check-bounds (cast-insert (reveal-functions (uniquify (shrink (type-check-R7 r7_16))))))

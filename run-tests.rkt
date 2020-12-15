@@ -121,7 +121,7 @@
      ("uniquify" ,uniquify ,interp-R7-prog)
      ("reveal functions" ,reveal-functions ,interp-R7-prog)
      ("cast insert" ,cast-insert ,interp-F3)
-     #;("check bounds" ,check-bounds ,interp-F3)
+     ("check bounds" ,check-bounds ,interp-F3)
      ("reveal casts" ,reveal-casts ,interp-F3)
      ("convert to closures" ,convert-to-closures ,interp-F3)
      ("limit functions" ,limit-functions ,interp-F3)
