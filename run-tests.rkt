@@ -130,10 +130,10 @@
      ("explicate control" ,explicate-control ,interp-C5)
      ("instruction selection" ,select-instructions ,interp-pseudo-x86-4)
      ("uncover live" ,uncover-live ,interp-pseudo-x86-4)
-     #;("build interference" ,build-interference ,interp-pseudo-x86-3)
-     #;("allocate registers" ,allocate-registers ,interp-x86-3)
-     #;("patch instructions" ,patch-instructions ,interp-x86-3)
-     #;("print x86" ,print-x86 #f)
+     ("build interference" ,build-interference ,interp-pseudo-x86-4)
+     ("allocate registers" ,allocate-registers ,interp-x86-4)
+     ("patch instructions" ,patch-instructions ,interp-x86-4)
+     ("print x86" ,print-x86 #f)
      ))
 
 (define all-tests
@@ -150,6 +150,6 @@
           (string=? r (car (string-split p "_"))))
         all-tests)))
 
-(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" #;(tests-for "r7") (list "16") #;(filter (lambda (v) (not (or (equal? v "7") (equal? v "7")))) (tests-for "r7")))
+(interp-tests "r7" type-check-R7 r7-passes interp-R7 "r7" #;(tests-for "r7") #;(list "12") (filter (lambda (v) (not (or (equal? v "7") (equal? v "7")))) (tests-for "r7")))
 #;(compiler-tests "r5" type-check-R5 r5-passes "r5" #;(tests-for "r5") (filter (lambda (v) (not (or (equal? v "15") (equal? v "16")))) (tests-for "r5")))
 

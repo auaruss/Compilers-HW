@@ -1576,7 +1576,7 @@
                                           (define def-alist (filter (λ (v) (not (equal? v '()))) (for/list ([l (get-vertices globalCFG)]) (if (equal? label (function-label l))
                                                                                                                                               (cons l (instructions l))
                                                                                                                                               '()))))
-                                          (Def label paramtypes returntype info def-alist)
+                                          (Def label paramtypes returntype (cons (cons 'locals let-binds) info) def-alist)
                                           ])))
      (ProgramDefs (cons (cons 'locals localvars) info) new-ds)]))
 
@@ -2061,7 +2061,7 @@
     [(IndirectCallq arg arity) (set)]
     [else (error "write-vars unmatched" instr)]))
 
-(define (build-interference-instr^ live-after g locals)
+(define (build-interference-instr^ live-after g)
   (λ (ast)
     (match ast
       [(or (Instr 'movq (list s d))
@@ -2073,7 +2073,7 @@
                  [else (add-edge! g d v)])))
        ast]
       [(or (IndirectCallq f arity) (Callq f arity))
-       (define vector-vars
+       #;(define vector-vars
          (filter (lambda (x) (not (equal? x '())))
                  (for/list ([e locals]) (if (and (list? (cdr e))
                                                  (equal? 'Vector (car (cdr e)))) (car e) '()))))
@@ -2085,7 +2085,7 @@
                (verbose "skip self edge on" v)
                (add-edge! g u v)))
          (for ([u callee-save-for-alloc^])
-           (if (or (equal? v u) (not (member v vector-vars)))
+           (if (or (equal? v u) #;(not (member v vector-vars)))
                (verbose "skip self edge or non-vector on" v)
                (add-edge! g u v))))
        ast]
@@ -2100,13 +2100,13 @@
 ;;(filter (lambda (x) (not (equal? x '()))) (for/list ([e `((x . (Vector Integer Integer)) (y . (Vector Integer)) (z . Integer))]) (if (and (list? (cdr e)) (equal? 'Vector (car (cdr e)))) (car e) '())))                      
 ;;(filter-map (λ (x) (and (list? (cdr x)) (list? (cadr x)) (equal? 'Vector (caadr x)) (car x))) `((x . (Vector Integer Integer)) (y . (Vector Integer)) (z . Integer)))                 
 
-(define (build-interference-block^ ast g locals)
+(define (build-interference-block^ ast g)
   (match ast
     [(Block info ss)
      (let* ([lives info]
             [live-afters lives]
             [new-ss (for/list ([inst ss] [live-after live-afters])
-                      ((build-interference-instr^ live-after g locals) inst))]
+                      ((build-interference-instr^ live-after g) inst))]
             [new-info '()])
        (Block info ss))]))
 
@@ -2116,9 +2116,9 @@
       [(Def label paramtypes returntype info alist)
        (define locals (dict-ref info 'locals))
        (let ([g (undirected-graph '())])
-         (for ([v locals]) (add-vertex! g (car v)))
+         (for ([v locals]) (add-vertex! g v))
          (for/list ([(label block) (in-dict alist)])
-                          (build-interference-block^ block g locals))
+                          (build-interference-block^ block g))
          (Def label paramtypes returntype
               (dict-set info 'conflicts g)
               alist))])))
@@ -2126,7 +2126,7 @@
 (define (build-interference ast)
   (match ast
     [(ProgramDefs info defns)
-     (define new-ds (map build-interference-cfg defns))
+     (define new-ds (for/list ([d defns]) (build-interference-cfg d)))
      (ProgramDefs info new-ds)]))
 
 ;; allocate-registers
@@ -2154,7 +2154,12 @@
 	 [else 
 	   #f]))
 
-(define (choose-least satset cand locals v)
+(define (choose-least satset cand v)
+  (if (not (member cand satset))
+      cand
+      (choose-least satset (add1 cand) v)))
+
+#;(define (choose-least satset cand locals v)
   (if (and (not (member cand satset)) 
 	   (or (and (even? cand) 
 		    (vector-type? locals v)) 
@@ -2190,7 +2195,7 @@
              [adj-verts (if (has-vertex? ig maxsat-vert)
                             (get-neighbors ig maxsat-vert)
                             '())]
-             [col (choose-least maxsat 0 locals maxsat-vert)])
+             [col (choose-least maxsat 0 maxsat-vert)])
         (for-each (λ (vert) (if (and (hash-has-key? hash vert)
                                      (not (member col (hash-ref hash vert))))
                                 (hash-set! hash vert
@@ -2240,7 +2245,14 @@
       [(ByteReg r) (ByteReg r)]
       [(Imm int) (Imm int)]
       [(Deref v i) (Deref v i)]
-      [(Var v) (if (vector-type? locals v)
+      [(Var v) (let ([colnum (dict-ref coloring v)])
+                    (if (<= colnum 10)
+                        (Reg (dict-ref REGCOLS colnum))
+                        (begin 
+			  (let ([location (* 8 (- colnum 11))])
+                          (set-add! spilled-root location)
+                          (Deref 'r15 location)))))]
+      #;[(Var v) (if (vector-type? locals v)
                   (let ([colnum (dict-ref coloring v)])
                     (if (<= colnum 10)
                         (Reg (dict-ref REGCOLS colnum))
@@ -2273,6 +2285,7 @@
       [(Instr 'set (list cc e)) (Instr 'set (list cc
                                                      (allocate-registers-exp e coloring locals)))]
       [(Instr 'negq (list e1)) (Instr 'negq (list (allocate-registers-exp e1 coloring locals)))]
+      [(Instr op es) (Instr op (for/list ([e es]) (allocate-registers-exp e coloring locals)))]
       [(IndirectCallq lbl arity) (IndirectCallq (allocate-registers-exp lbl coloring locals) arity)]
       [(TailJmp arg arity) (TailJmp (allocate-registers-exp arg coloring locals) arity)]
       [(Callq l arity) (Callq l arity)]
@@ -2335,7 +2348,7 @@
      (define new-ds (for/list ([d ds])
                       (match d
                         [(Def label paramtypes returntype info alist)
-                         (let* ([locals (dict-ref info 'locals)]
+                         (let* ([locals '() #;(dict-ref info 'locals)]
                                 [ig (dict-ref info 'conflicts)]
                                 [pre-color (map (λ (vert) (if (reg-sym? vert)
                                                               (color-reg vert)
@@ -2406,7 +2419,7 @@
        [(list (Deref a b) (Global name)) (list (Instr 'movq (list e1 (Reg 'rax)))
                                                (Instr op (list (Reg 'rax) e2)))]
        [(list x y) (list (Instr op (list e1 e2)))])]
-    [(Instr op (list e1)) (list (Instr op (list e1)))]
+    [(Instr op es) (list (Instr op es))]
     [i (list i)]))
 
 (define (patch-instructions-block px86block)
@@ -2538,6 +2551,10 @@
     [(Instr 'set (list cc a1))
      (define st1 (stringify-arg a1))
      (format "set~a\t~a" cc st1)]
+    [(Instr op (list a1 a2))
+     (define st1 (stringify-arg a1))
+     (define st2 (stringify-arg a2))
+     (format "~a\t~a, ~a" op st1 st2)]
     [(Instr 'negq (list a))
      (define st (stringify-arg a))
      (format "negq\t~a" st)]
